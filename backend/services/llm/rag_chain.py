@@ -98,6 +98,11 @@ def build_history(messages: list[dict]) -> list:
     return history
 
 
+def _is_rate_limit(e: Exception) -> bool:
+    err = str(e)
+    return "429" in err or "ResourceExhausted" in err or "quota" in err.lower()
+
+
 async def answer(
     question: str,
     recalls: list[dict],
@@ -108,28 +113,43 @@ async def answer(
     """
     Generate an answer given a question, retrieved recalls, and chat history.
 
-    Retries on transient rate-limit (429/ResourceExhausted) errors with exponential backoff.
+    For non-streaming: retries on rate-limit errors with exponential backoff.
+    For streaming: returns an async generator that retries internally.
     """
-    chain = build_rag_chain(streaming=streaming)
-
     inputs = {
         "context": format_recalls_context(recalls),
         "history": build_history(history),
         "question": question,
     }
 
+    if streaming:
+        return _stream_with_retry(inputs, max_retries)
+
+    chain = build_rag_chain(streaming=False)
     for attempt in range(max_retries):
         try:
-            if streaming:
-                return chain.astream(inputs)
-            else:
-                return await chain.ainvoke(inputs)
+            return await chain.ainvoke(inputs)
         except Exception as e:
-            err = str(e)
-            is_rate_limit = "429" in err or "ResourceExhausted" in err or "quota" in err.lower()
-            if is_rate_limit and attempt < max_retries - 1:
+            if _is_rate_limit(e) and attempt < max_retries - 1:
                 wait = 20 * (attempt + 1)
-                logger.warning("LLM rate limit hit, retrying in %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
+                logger.warning("LLM rate limit, retrying in %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
+                await asyncio.sleep(wait)
+                continue
+            raise
+
+
+async def _stream_with_retry(inputs: dict, max_retries: int = 3) -> AsyncIterator[str]:
+    """Async generator that streams LLM tokens and retries the whole call on rate limits."""
+    chain = build_rag_chain(streaming=True)
+    for attempt in range(max_retries):
+        try:
+            async for token in chain.astream(inputs):
+                yield token
+            return
+        except Exception as e:
+            if _is_rate_limit(e) and attempt < max_retries - 1:
+                wait = 20 * (attempt + 1)
+                logger.warning("LLM rate limit during stream, retrying in %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
                 await asyncio.sleep(wait)
                 continue
             raise
