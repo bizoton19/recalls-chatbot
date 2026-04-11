@@ -43,7 +43,9 @@ def get_database_url(async_driver: bool = True) -> str:
     raw = raw.replace("postgres://", "postgresql://", 1)
 
     if async_driver:
-        # Insert asyncpg driver
+        # asyncpg uses ?ssl=require instead of ?sslmode=require
+        raw = raw.replace("sslmode=require", "ssl=require")
+        raw = raw.replace("sslmode=disable", "")
         return raw.replace("postgresql://", "postgresql+asyncpg://", 1)
 
     return raw

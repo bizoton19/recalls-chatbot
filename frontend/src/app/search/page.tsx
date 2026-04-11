@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   textSearch,
@@ -697,7 +697,7 @@ function ResultsPanel({
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function SearchPage() {
+function SearchPageInner() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
   const imageSearchEnabled = useImageSearchEnabled();
@@ -838,5 +838,13 @@ export default function SearchPage() {
         }
       `}</style>
     </>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense>
+      <SearchPageInner />
+    </Suspense>
   );
 }

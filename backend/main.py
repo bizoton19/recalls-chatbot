@@ -21,8 +21,21 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: create tables, seed agencies, start scheduler
+    from sqlalchemy import text
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+    from models.recall import Agency
+
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+
+        # Seed known agencies
+        await conn.execute(
+            pg_insert(Agency).values([
+                {"code": "CPSC", "name": "U.S. Consumer Product Safety Commission",
+                 "url": "https://www.cpsc.gov", "api_url": "https://www.saferproducts.gov/RestWebServices/Recall"},
+            ]).on_conflict_do_nothing(index_elements=["code"])
+        )
 
     logger.info("Database tables ready")
 

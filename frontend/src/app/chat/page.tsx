@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   createChatSession,
@@ -18,7 +18,7 @@ const SUGGESTIONS = [
   "Show me recalls involving children's toys from 2024",
 ];
 
-export default function ChatPage() {
+function ChatPageInner() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
 
@@ -294,6 +294,14 @@ export default function ChatPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense>
+      <ChatPageInner />
+    </Suspense>
   );
 }
 
