@@ -4,6 +4,15 @@ All defaults are safe for local development.
 Production values are set in the Railway dashboard.
 """
 import os
+from pathlib import Path
+
+# Load project-root .env when running `uvicorn` from backend/ (local dev)
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except ImportError:
+    pass
 
 
 def _require(key: str) -> str:
