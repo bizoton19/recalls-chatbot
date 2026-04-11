@@ -1,4 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// NEXT_PUBLIC_API_URL is baked in at build time by Next.js.
+// In Railway: set this to your backend service's public URL before deploying.
+// e.g. https://recalls-backend.up.railway.app
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined" && (window as any).__NEXT_PUBLIC_API_URL__) ||
+  "http://localhost:8000";
 
 export interface Recall {
   id: string;

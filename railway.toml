@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+# Railway reads this file but each service is configured individually
+# in the Railway dashboard pointing to the correct root directory.
+#
+# Services to create in Railway:
+#   1. backend  → Root: /backend,  Start: uvicorn main:app --host 0.0.0.0 --port $PORT
+#   2. frontend → Root: /frontend, Start: node server.js
+#   3. database → Add PostgreSQL plugin (pgvector enabled automatically)

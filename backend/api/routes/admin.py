@@ -2,13 +2,14 @@
 Admin routes — for triggering ingestion manually.
 Protected by a simple API key header in production.
 """
-import os
 from fastapi import APIRouter, Depends, Header, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
+from config import settings
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-ADMIN_KEY = os.getenv("ADMIN_API_KEY", "dev-admin-key")
+ADMIN_KEY = settings.admin_api_key
 
 
 def verify_admin_key(x_admin_key: str = Header(...)):

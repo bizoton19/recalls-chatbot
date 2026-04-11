@@ -2,13 +2,13 @@
 Recalls Chatbot — FastAPI application entry point.
 """
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import recalls, chat, admin
+from config import settings
 from db.database import engine, Base
 
 logging.basicConfig(
@@ -54,10 +54,9 @@ app = FastAPI(
 )
 
 # CORS
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in cors_origins],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,4 +70,18 @@ app.include_router(admin.router, prefix="/api")
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    from sqlalchemy import text
+    from db.database import AsyncSessionLocal
+    db_ok = False
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+            db_ok = True
+    except Exception:
+        pass
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "db": db_ok,
+        "version": "1.0.0",
+        "environment": settings.environment,
+    }
