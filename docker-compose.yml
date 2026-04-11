@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -25,11 +23,16 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://recalls_user:${POSTGRES_PASSWORD:-recalls_dev_password}@db:5432/recalls
       DATABASE_URL_SYNC: postgresql://recalls_user:${POSTGRES_PASSWORD:-recalls_dev_password}@db:5432/recalls
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      JINA_API_KEY: ${JINA_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-key}
       INGESTION_SCHEDULE_HOURS: ${INGESTION_SCHEDULE_HOURS:-6}
     ports:
       - "8000:8000"
@@ -46,6 +49,7 @@ services:
       dockerfile: Dockerfile
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      WATCHPACK_POLLING: "true"
     ports:
       - "3000:3000"
     depends_on:

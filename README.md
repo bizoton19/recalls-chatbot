@@ -28,7 +28,9 @@ AI-powered consumer product recall search and conversational assistant, powered 
 
 ```bash
 cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Edit .env:
+#   OPENAI_API_KEY — required for text embeddings (RAG search)
+#   GOOGLE_API_KEY — if LLM_PROVIDER=google (Gemini chat)
 ```
 
 ### 2. Start all services

@@ -11,7 +11,7 @@ import {
 } from "@/lib/api";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ---------------------------------------------------------------------------
 // Feature flag hook — checks backend for image search availability
@@ -21,7 +21,7 @@ function useImageSearchEnabled() {
   const [enabled, setEnabled] = useState<boolean | null>(null); // null = loading
 
   useEffect(() => {
-    fetch(`${API_URL}/search/status`)
+    fetch(`${API_URL}/api/search/status`)
       .then((r) => r.json())
       .then((d) => setEnabled(!!d.image_search))
       .catch(() => setEnabled(false));
