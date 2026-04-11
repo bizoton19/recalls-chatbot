@@ -49,10 +49,12 @@ class Settings:
     # LLM
     llm_provider: str = os.getenv("LLM_PROVIDER", "openai")
     llm_model: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "models/text-embedding-004")
+    embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "google")
 
     # API Keys (optional — only required if using that provider)
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
 

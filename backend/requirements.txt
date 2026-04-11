@@ -26,6 +26,8 @@ apscheduler==3.10.4
 
 # Image upload handling (Jina embeddings via HTTP — no local ML model needed)
 # Set JINA_API_KEY to enable image search. torch/transformers not required.
+# Pillow: Gemini vision description for image upload search
+Pillow==11.0.0
 python-multipart==0.0.20
 
 # Utilities

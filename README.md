@@ -28,9 +28,9 @@ AI-powered consumer product recall search and conversational assistant, powered 
 
 ```bash
 cp .env.example .env
-# Edit .env:
-#   OPENAI_API_KEY — required for text embeddings (RAG search)
-#   GOOGLE_API_KEY — if LLM_PROVIDER=google (Gemini chat)
+# Edit .env — minimum for Google-only:
+#   GOOGLE_API_KEY — Gemini chat + text embeddings (RAG) + optional image description
+# Optional: DATABASE_URL — use your Railway Postgres URL instead of the local `db` container
 ```
 
 ### 2. Start all services
@@ -64,7 +64,13 @@ This fetches all CPSC recall data (30 years) and indexes it into pgvector. Takes
 Change `LLM_PROVIDER` in `.env` — no code changes needed:
 
 ```bash
-# OpenAI (default)
+# Google Gemini (default in .env.example — chat + embeddings with one key)
+LLM_PROVIDER=google
+LLM_MODEL=gemini-2.0-flash
+GOOGLE_API_KEY=AIza...
+EMBEDDING_PROVIDER=google
+
+# OpenAI
 LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 OPENAI_API_KEY=sk-...
@@ -84,6 +90,8 @@ LLM_PROVIDER=ollama
 LLM_MODEL=llama3.2
 OLLAMA_BASE_URL=http://localhost:11434
 ```
+
+**Text embeddings (RAG)** use `EMBEDDING_PROVIDER` separately: `google` (same `GOOGLE_API_KEY`, `models/text-embedding-004`, 1536 dims) or `openai` (`OPENAI_API_KEY`). Do not change embedding model or dimension after you have indexed data without re-ingesting.
 
 ## API Endpoints
 

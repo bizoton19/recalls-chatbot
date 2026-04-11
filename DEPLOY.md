@@ -56,14 +56,17 @@ In Railway project → click the auto-created service → **Settings**:
 
 | Variable | Value | Notes |
 |----------|-------|-------|
-| `OPENAI_API_KEY` | `sk-...` | Your OpenAI key |
-| `LLM_PROVIDER` | `openai` | Or: anthropic, groq, ollama |
-| `LLM_MODEL` | `gpt-4o-mini` | Or: gpt-4o for higher quality |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | Do not change after first index |
+| `GOOGLE_API_KEY` | `AIza...` | Gemini chat + text embeddings (RAG); one key for both |
+| `LLM_PROVIDER` | `google` | Or: openai, anthropic, groq, openrouter, ollama |
+| `LLM_MODEL` | `gemini-2.0-flash` | Or another Gemini model id |
+| `EMBEDDING_PROVIDER` | `google` | Default; use `openai` only if you index with OpenAI embeddings |
+| `EMBEDDING_MODEL` | *(omit)* | Defaults to `models/text-embedding-004` when `EMBEDDING_PROVIDER=google` |
+| `EMBEDDING_DIMENSIONS` | `1536` | Must match `recall_embeddings` column; do not change after first index |
+| `OPENAI_API_KEY` | *(omit)* | Only if `LLM_PROVIDER=openai` or `EMBEDDING_PROVIDER=openai` |
 | `CORS_ORIGINS` | `https://YOUR-FRONTEND.up.railway.app` | Set after frontend deploys |
 | `ADMIN_API_KEY` | *(generate a strong random string)* | Protects /api/admin/ingest |
 | `INGESTION_SCHEDULE_HOURS` | `6` | How often to re-sync CPSC data |
-| `DATABASE_URL` | *(auto-injected by Railway from Postgres plugin)* | Do not set manually |
+| `DATABASE_URL` | *(auto-injected by Railway from Postgres plugin)* | Reference variable from the DB service |
 
 ---
 
@@ -137,10 +140,10 @@ Railway offers $5 free credit/month — prototype costs ~$10/month net.
 ### Backend (copy-paste into Railway Variables tab)
 
 ```
-OPENAI_API_KEY=sk-...
-LLM_PROVIDER=openai
-LLM_MODEL=gpt-4o-mini
-EMBEDDING_MODEL=text-embedding-3-small
+GOOGLE_API_KEY=AIza...
+LLM_PROVIDER=google
+LLM_MODEL=gemini-2.0-flash
+EMBEDDING_PROVIDER=google
 CORS_ORIGINS=https://YOUR-FRONTEND.up.railway.app
 ADMIN_API_KEY=change-me-to-a-strong-random-string
 INGESTION_SCHEDULE_HOURS=6

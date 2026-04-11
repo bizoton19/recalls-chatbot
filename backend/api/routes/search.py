@@ -156,42 +156,61 @@ async def image_search(
     }
 
 
+_VISION_PROMPT = (
+    "Describe this consumer product in 1-2 sentences focusing on: "
+    "product type, brand name (if visible), color, material, and any "
+    "model numbers or labels you can read. Be specific and factual. "
+    "Do not mention recalls — only describe what you see."
+)
+
+
 async def _describe_image_with_vision(image_bytes: bytes) -> Optional[str]:
-    """Use GPT-4o-mini vision to extract a product description from an uploaded image."""
-    if not settings.openai_api_key:
-        return None
+    """Extract a product description from an image: OpenAI vision if set, else Gemini."""
+    if settings.openai_api_key:
+        from openai import AsyncOpenAI
 
-    from openai import AsyncOpenAI
-
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
-    b64 = base64.b64encode(image_bytes).decode("utf-8")
-
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        max_tokens=200,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{b64}",
-                            "detail": "low",
+        client = AsyncOpenAI(api_key=settings.openai_api_key)
+        b64 = base64.b64encode(image_bytes).decode("utf-8")
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=200,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{b64}",
+                                "detail": "low",
+                            },
                         },
-                    },
-                    {
-                        "type": "text",
-                        "text": (
-                            "Describe this consumer product in 1-2 sentences focusing on: "
-                            "product type, brand name (if visible), color, material, and any "
-                            "model numbers or labels you can read. Be specific and factual. "
-                            "Do not mention recalls — only describe what you see."
-                        ),
-                    },
-                ],
-            }
-        ],
-    )
+                        {"type": "text", "text": _VISION_PROMPT},
+                    ],
+                }
+            ],
+        )
+        return response.choices[0].message.content.strip()
 
-    return response.choices[0].message.content.strip()
+    if settings.google_api_key:
+        return await _describe_image_with_gemini(image_bytes)
+
+    return None
+
+
+async def _describe_image_with_gemini(image_bytes: bytes) -> Optional[str]:
+    import asyncio
+    import io
+
+    import google.generativeai as genai
+    from PIL import Image
+
+    genai.configure(api_key=settings.google_api_key)
+    model = genai.GenerativeModel(settings.llm_model or "gemini-2.0-flash")
+
+    def _sync() -> str:
+        img = Image.open(io.BytesIO(image_bytes))
+        resp = model.generate_content([_VISION_PROMPT, img])
+        return (resp.text or "").strip()
+
+    return await asyncio.to_thread(_sync)
