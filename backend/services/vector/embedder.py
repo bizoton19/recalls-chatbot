@@ -3,9 +3,9 @@ Embedding service — text vectors for RAG (pgvector).
 
 Set EMBEDDING_PROVIDER to choose backend (independent of LLM_PROVIDER):
 
-  google (default) → Google models/text-embedding-004, 1536-dim (Matryoshka), same GOOGLE_API_KEY as Gemini
+  google (default) → gemini-embedding-001, 768-dim, same GOOGLE_API_KEY as Gemini
   openai          → text-embedding-3-small (1536 dims)
-  ollama          → nomic-embed-text (768 dims — requires schema change to vector(768))
+  ollama          → nomic-embed-text (768 dims)
 
 When using Google embeddings, OPENAI_API_KEY is not required for indexing or search.
 """
@@ -17,10 +17,10 @@ _explicit_model = os.getenv("EMBEDDING_MODEL")
 if _explicit_model:
     EMBEDDING_MODEL = _explicit_model
 elif EMBEDDING_PROVIDER == "google":
-    EMBEDDING_MODEL = "models/text-embedding-004"
+    EMBEDDING_MODEL = "models/gemini-embedding-001"
 else:
     EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_DIMS = int(os.getenv("EMBEDDING_DIMENSIONS", "1536"))
+EMBEDDING_DIMS = int(os.getenv("EMBEDDING_DIMENSIONS", "768"))
 
 
 class EmbedderProtocol(Protocol):
@@ -29,9 +29,11 @@ class EmbedderProtocol(Protocol):
 
 
 class GoogleEmbedder:
-    """Google Generative Language API — same key as ChatGoogleGenerativeAI."""
+    """Google gemini-embedding-001 via google.generativeai (v1beta supports this model)."""
 
     def __init__(self) -> None:
+        import warnings
+        warnings.filterwarnings("ignore", category=FutureWarning)
         import google.generativeai as genai
 
         key = os.getenv("GOOGLE_API_KEY", "")
@@ -45,6 +47,8 @@ class GoogleEmbedder:
         self._dims = EMBEDDING_DIMS
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
+        import warnings
+        warnings.filterwarnings("ignore", category=FutureWarning)
         import google.generativeai as genai
 
         out: list[list[float]] = []
@@ -59,6 +63,8 @@ class GoogleEmbedder:
         return out
 
     async def embed_query(self, text: str) -> list[float]:
+        import warnings
+        warnings.filterwarnings("ignore", category=FutureWarning)
         import google.generativeai as genai
 
         r = await genai.embed_content_async(

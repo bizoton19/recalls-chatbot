@@ -5,6 +5,7 @@ POST /api/chat/session          — create a new chat session
 POST /api/chat/{session_token}  — send a message, get a streaming response
 GET  /api/chat/{session_token}/history — fetch message history
 """
+import logging
 import secrets
 import uuid
 from datetime import datetime
@@ -20,6 +21,8 @@ from db.database import get_db
 from models.recall import ChatSession, ChatMessage
 from services.vector.store import similarity_search
 from services.llm.rag_chain import answer, format_recalls_context
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -69,14 +72,18 @@ async def send_message(
     # Retrieve conversation history
     history = await _get_history(session.id, db)
 
-    # Semantic search: find relevant recalls
+    # Semantic search: find relevant recalls (best-effort — empty list if not indexed yet)
     agency_filter = body.agencies if body.agencies else None
-    recalls = await similarity_search(
-        query=body.message,
-        db=db,
-        top_k=8,
-        agency_codes=agency_filter,
-    )
+    try:
+        recalls = await similarity_search(
+            query=body.message,
+            db=db,
+            top_k=8,
+            agency_codes=agency_filter,
+        )
+    except Exception as e:
+        logger.warning("Similarity search failed (embeddings may not be ready): %s", e)
+        recalls = []
 
     # Save user message
     user_msg = ChatMessage(
@@ -107,12 +114,15 @@ async def send_message(
             },
         )
     else:
-        response_text = await answer(
-            question=body.message,
-            recalls=recalls,
-            history=history_dicts,
-            streaming=False,
-        )
+        try:
+            response_text = await answer(
+                question=body.message,
+                recalls=recalls,
+                history=history_dicts,
+                streaming=False,
+            )
+        except Exception as e:
+            _raise_llm_error(e)
         await _save_assistant_message(session.id, response_text, recalls, db)
         return {
             "response": response_text,
@@ -129,17 +139,37 @@ async def _stream_response(
     db: AsyncSession,
 ) -> AsyncIterator[str]:
     """Stream response tokens as SSE, then persist the full message."""
-    stream = await answer(question=question, recalls=recalls, history=history, streaming=True)
-
-    full_response = ""
-    async for token in stream:
-        full_response += token
-        yield f"data: {token}\n\n"
+    try:
+        stream = await answer(question=question, recalls=recalls, history=history, streaming=True)
+        full_response = ""
+        async for token in stream:
+            full_response += token
+            yield f"data: {token}\n\n"
+    except Exception as e:
+        msg = _friendly_llm_error(e)
+        yield f"data: {msg}\n\n"
+        full_response = msg
 
     yield f"event: done\ndata: \n\n"
 
     await _save_assistant_message(session_id, full_response, recalls, db)
     await db.commit()
+
+
+def _friendly_llm_error(e: Exception) -> str:
+    err = str(e)
+    if "429" in err or "ResourceExhausted" in err or "quota" in err.lower():
+        return (
+            "I'm temporarily unavailable due to API rate limits. "
+            "Please wait a moment and try again."
+        )
+    return "I encountered an error generating a response. Please try again."
+
+
+def _raise_llm_error(e: Exception) -> None:
+    msg = _friendly_llm_error(e)
+    logger.error("LLM error: %s", e)
+    raise HTTPException(status_code=503, detail=msg)
 
 
 async def _save_assistant_message(

@@ -110,7 +110,7 @@ class RecallEmbedding(Base):
     recall_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("recalls.id", ondelete="CASCADE"))
     chunk_index: Mapped[int] = mapped_column(SmallInteger, default=0)
     chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding: Mapped[Optional[list[float]]] = mapped_column(Vector(1536))
+    embedding: Mapped[Optional[list[float]]] = mapped_column(Vector(768))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     recall: Mapped[Recall] = relationship(back_populates="embeddings")

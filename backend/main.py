@@ -29,6 +29,19 @@ async def lifespan(app: FastAPI):
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
 
+        # Migrate embedding column from vector(1536) → vector(768) if needed.
+        # recall_embeddings is safe to truncate since indexing runs on every startup.
+        await conn.execute(text(
+            "DO $$ BEGIN "
+            "  IF EXISTS (SELECT 1 FROM information_schema.columns "
+            "              WHERE table_name='recall_embeddings' AND column_name='embedding') THEN "
+            "    EXECUTE 'ALTER TABLE recall_embeddings ALTER COLUMN embedding TYPE vector(768)'; "
+            "    DELETE FROM recall_embeddings; "
+            "    UPDATE recalls SET is_indexed = FALSE; "
+            "  END IF; "
+            "END $$;"
+        ))
+
         # Seed known agencies
         await conn.execute(
             pg_insert(Agency).values([

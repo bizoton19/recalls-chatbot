@@ -6,6 +6,7 @@ Supports all 3 chat behaviors:
   Level 2 — Semantic search via pgvector, LLM synthesizes an answer
   Level 3 — Conversational memory: past messages included as history
 """
+import asyncio
 import logging
 from typing import AsyncIterator
 
@@ -102,18 +103,12 @@ async def answer(
     recalls: list[dict],
     history: list[dict],
     streaming: bool = False,
+    max_retries: int = 3,
 ) -> str | AsyncIterator[str]:
     """
     Generate an answer given a question, retrieved recalls, and chat history.
 
-    Args:
-        question:  The user's question.
-        recalls:   Recall records retrieved via vector search.
-        history:   Prior messages in this chat session.
-        streaming: Whether to stream the response token by token.
-
-    Returns:
-        Full string answer (streaming=False) or async iterator of tokens (streaming=True).
+    Retries on transient rate-limit (429/ResourceExhausted) errors with exponential backoff.
     """
     chain = build_rag_chain(streaming=streaming)
 
@@ -123,7 +118,18 @@ async def answer(
         "question": question,
     }
 
-    if streaming:
-        return chain.astream(inputs)
-    else:
-        return await chain.ainvoke(inputs)
+    for attempt in range(max_retries):
+        try:
+            if streaming:
+                return chain.astream(inputs)
+            else:
+                return await chain.ainvoke(inputs)
+        except Exception as e:
+            err = str(e)
+            is_rate_limit = "429" in err or "ResourceExhausted" in err or "quota" in err.lower()
+            if is_rate_limit and attempt < max_retries - 1:
+                wait = 20 * (attempt + 1)
+                logger.warning("LLM rate limit hit, retrying in %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
+                await asyncio.sleep(wait)
+                continue
+            raise
