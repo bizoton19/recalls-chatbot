@@ -1,0 +1,29 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
+pgvector==0.3.6
+alembic==1.14.0
+
+# LangChain core + providers
+langchain==0.3.13
+langchain-core==0.3.28
+langchain-openai==0.2.14
+langchain-anthropic==0.3.3
+langchain-groq==0.2.3
+langchain-ollama==0.2.3
+
+# OpenAI SDK (also used directly for embeddings)
+openai==1.58.1
+
+# HTTP client
+httpx==0.28.1
+
+# Scheduling
+apscheduler==3.10.4
+
+# Utilities
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
