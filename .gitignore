@@ -1,11 +1,29 @@
+# Environment
 .env
+.env.local
+.env.*.local
+
+# Python
 __pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
+*.py[cod]
+*.egg-info/
 .venv/
 venv/
+dist/
+build/
+*.egg
+
+# Node / Next.js
 node_modules/
 .next/
-*.log
+out/
+npm-debug.log*
+
+# Docker
+pgdata/
+
+# IDE
 .DS_Store
+.idea/
+.vscode/
+*.swp

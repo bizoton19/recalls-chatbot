@@ -10,19 +10,21 @@ from services.vector.store import similarity_search
 
 router = APIRouter(prefix="/recalls", tags=["recalls"])
 
-AGENCY_CHOICES = ["CPSC", "NHTSA", "FDA", "USDA", "EPA", "USCG"]
-
-
 @router.get("/latest")
 async def get_latest_recalls(
     limit: int = Query(default=20, ge=1, le=100),
-    agency: Optional[str] = Query(default=None),
+    product_type: Optional[str] = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return the most recent recalls, optionally filtered by agency."""
-    q = select(Recall).order_by(desc(Recall.recall_date), desc(Recall.created_at)).limit(limit)
-    if agency:
-        q = q.where(Recall.agency_code == agency.upper())
+    """Return the most recent CPSC recalls, optionally filtered by product type."""
+    q = (
+        select(Recall)
+        .where(Recall.agency_code == "CPSC")
+        .order_by(desc(Recall.recall_date), desc(Recall.created_at))
+        .limit(limit)
+    )
+    if product_type:
+        q = q.where(Recall.product_type.ilike(f"%{product_type}%"))
 
     result = await db.execute(q)
     recalls = result.scalars().all()
