@@ -70,6 +70,9 @@ class Recall(Base):
     embeddings: Mapped[list["RecallEmbedding"]] = relationship(
         back_populates="recall", cascade="all, delete-orphan"
     )
+    images: Mapped[list["RecallImage"]] = relationship(
+        back_populates="recall", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("agency_code", "external_id"),
@@ -114,6 +117,26 @@ class RecallEmbedding(Base):
 
     __table_args__ = (
         UniqueConstraint("recall_id", "chunk_index"),
+    )
+
+
+class RecallImage(Base):
+    __tablename__ = "recall_images"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    recall_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("recalls.id", ondelete="CASCADE"))
+    image_url: Mapped[str] = mapped_column(Text, nullable=False)
+    image_index: Mapped[int] = mapped_column(SmallInteger, default=0)
+    alt_text: Mapped[Optional[str]] = mapped_column(Text)
+    local_path: Mapped[Optional[str]] = mapped_column(Text)
+    clip_embedding: Mapped[Optional[list[float]]] = mapped_column(Vector(512))
+    is_embedded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+    recall: Mapped[Recall] = relationship(back_populates="images")
+
+    __table_args__ = (
+        UniqueConstraint("recall_id", "image_index"),
     )
 
 

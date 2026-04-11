@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import recalls, chat, admin
+from api.routes import recalls, chat, admin, search
 from config import settings
 from db.database import engine, Base
 
@@ -66,6 +66,7 @@ app.add_middleware(
 app.include_router(recalls.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(search.router, prefix="/api")
 
 
 @app.get("/health")

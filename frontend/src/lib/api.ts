@@ -58,6 +58,52 @@ export async function searchRecalls(query: string, topK = 8): Promise<Recall[]> 
   return data.results;
 }
 
+export interface ImageResult {
+  image_id: string;
+  image_url: string;
+  alt_text: string | null;
+  recall_id: string;
+  title: string;
+  agency_code: string;
+  recall_number: string | null;
+  recall_date: string | null;
+  hazard: string | null;
+  remedy: string | null;
+  brand_name: string | null;
+  manufacturer: string | null;
+  recall_url: string | null;
+  similarity: number;
+}
+
+export interface UnifiedSearchResult {
+  query?: string;
+  vision_description?: string;
+  recalls: Recall[];
+  images: ImageResult[];
+}
+
+export async function textSearch(query: string, topK = 8): Promise<UnifiedSearchResult> {
+  const params = new URLSearchParams({ q: query, top_k: String(topK) });
+  const res = await fetch(`${API_URL}/api/search?${params}`);
+  if (!res.ok) throw new Error("Search failed");
+  return res.json();
+}
+
+export async function imageSearch(file: File, topK = 12): Promise<UnifiedSearchResult> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("top_k", String(topK));
+  const res = await fetch(`${API_URL}/api/search/image`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Image search failed");
+  }
+  return res.json();
+}
+
 export async function createChatSession(): Promise<string> {
   const res = await fetch(`${API_URL}/api/chat/session`, { method: "POST" });
   if (!res.ok) throw new Error("Failed to create session");

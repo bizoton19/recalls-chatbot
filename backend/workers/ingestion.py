@@ -23,6 +23,7 @@ from db.database import get_db_context
 from models.recall import Recall
 from services.recalls import ALL_CLIENTS, RecallRecord
 from services.vector.store import index_pending
+from services.vector.image_store import ingest_recall_images
 
 logger = logging.getLogger(__name__)
 
@@ -152,17 +153,34 @@ async def run_ingestion(full_sync: bool = False) -> dict:
                 logger.error("Ingestion failed for %s: %s", agency, e)
                 summary["errors"].append({"agency": agency, "error": str(e)})
 
-        # Embed all pending recalls
-        logger.info("Embedding pending recalls ...")
+        # Text-embed all pending recalls
+        logger.info("Text-embedding pending recalls ...")
         indexed = 0
         while True:
             batch_indexed = await index_pending(db, batch_size=50)
             indexed += batch_indexed
             if batch_indexed == 0:
                 break
-            logger.info("Indexed %d recalls so far ...", indexed)
+            logger.info("Text-indexed %d recalls so far ...", indexed)
 
         summary["total_indexed"] = indexed
+
+        # CLIP-embed product images for newly ingested recalls
+        logger.info("CLIP-embedding recall product images ...")
+        images_stored = 0
+        result = await db.execute(
+            select(Recall).where(Recall.agency_code == "CPSC").limit(500)
+        )
+        recalls_for_images = result.scalars().all()
+        for recall in recalls_for_images:
+            try:
+                count = await ingest_recall_images(recall, db)
+                images_stored += count
+            except Exception as e:
+                logger.warning("Image ingestion failed for recall %s: %s", recall.id, e)
+
+        summary["total_images_stored"] = images_stored
+        logger.info("Stored %d product images", images_stored)
         summary["finished_at"] = datetime.utcnow().isoformat()
         logger.info("Ingestion complete: %s", summary)
 

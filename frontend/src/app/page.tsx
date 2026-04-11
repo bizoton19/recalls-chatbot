@@ -204,10 +204,10 @@ export default function HomePage() {
         )}
 
         {/* CTA */}
-        <div style={{ marginTop: "2.5rem", textAlign: "center" }}>
-          <p style={{ color: "#565c65", marginBottom: "1rem" }}>
-            Can&apos;t find what you&apos;re looking for? Our AI assistant can answer detailed questions.
-          </p>
+        <div style={{ marginTop: "2.5rem", textAlign: "center", display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
+          <a href="/search" className="usa-button usa-button--outline">
+            Search by Product Image
+          </a>
           <a href="/chat" className="usa-button">
             Ask the Recall Assistant
           </a>

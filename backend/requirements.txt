@@ -23,6 +23,13 @@ httpx==0.28.1
 # Scheduling
 apscheduler==3.10.4
 
+# Image / CLIP
+torch==2.5.1
+torchvision==0.20.1
+transformers==4.47.1
+Pillow==11.0.0
+python-multipart==0.0.20
+
 # Utilities
 pydantic==2.10.4
 pydantic-settings==2.7.0

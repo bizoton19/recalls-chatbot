@@ -75,25 +75,49 @@ CREATE INDEX IF NOT EXISTS idx_recalls_is_indexed  ON recalls (is_indexed) WHERE
 CREATE INDEX IF NOT EXISTS idx_recalls_raw_data    ON recalls USING GIN (raw_data);
 
 -- ---------------------------------------------------------------------------
--- Recall Embeddings (pgvector)
+-- Recall Embeddings — text vectors (pgvector, 1536 dims)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS recall_embeddings (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     recall_id   UUID        NOT NULL REFERENCES recalls(id) ON DELETE CASCADE,
-    chunk_index SMALLINT    NOT NULL DEFAULT 0,   -- for multi-chunk recalls
-    chunk_text  TEXT        NOT NULL,              -- the text that was embedded
-    embedding   vector(1536),                      -- text-embedding-3-small = 1536 dims
+    chunk_index SMALLINT    NOT NULL DEFAULT 0,
+    chunk_text  TEXT        NOT NULL,
+    embedding   vector(1536),                      -- text-embedding-3-small
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     UNIQUE (recall_id, chunk_index)
 );
 
--- IVFFlat index for approximate nearest-neighbor search
--- (Switch to HNSW for production: CREATE INDEX ... USING hnsw)
 CREATE INDEX IF NOT EXISTS idx_recall_embeddings_ivfflat
     ON recall_embeddings
     USING ivfflat (embedding vector_cosine_ops)
     WITH (lists = 100);
+
+-- ---------------------------------------------------------------------------
+-- Recall Images — product photos + CLIP visual embeddings (512 dims)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS recall_images (
+    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    recall_id       UUID        NOT NULL REFERENCES recalls(id) ON DELETE CASCADE,
+    image_url       TEXT        NOT NULL,
+    image_index     SMALLINT    NOT NULL DEFAULT 0,  -- order within recall
+    alt_text        TEXT,                             -- from CPSC API
+    local_path      TEXT,                             -- cached local copy (optional)
+    clip_embedding  vector(512),                      -- CLIP ViT-B/32
+    is_embedded     BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    UNIQUE (recall_id, image_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recall_images_recall
+    ON recall_images (recall_id);
+
+CREATE INDEX IF NOT EXISTS idx_recall_images_clip
+    ON recall_images
+    USING ivfflat (clip_embedding vector_cosine_ops)
+    WITH (lists = 100)
+    WHERE clip_embedding IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- Chat Sessions
