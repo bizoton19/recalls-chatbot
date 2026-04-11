@@ -165,8 +165,13 @@ async def run_ingestion(full_sync: bool = False) -> dict:
 
         summary["total_indexed"] = indexed
 
-        # CLIP-embed product images for newly ingested recalls
-        logger.info("CLIP-embedding recall product images ...")
+        # Store image URLs and embed when Jina is enabled
+        from services.vector import jina_embedder
+        jina_active = jina_embedder.is_enabled()
+        logger.info(
+            "Processing recall product images (Jina embedding: %s) ...",
+            "enabled" if jina_active else "disabled — set JINA_API_KEY to enable"
+        )
         images_stored = 0
         result = await db.execute(
             select(Recall).where(Recall.agency_code == "CPSC").limit(500)
@@ -180,7 +185,8 @@ async def run_ingestion(full_sync: bool = False) -> dict:
                 logger.warning("Image ingestion failed for recall %s: %s", recall.id, e)
 
         summary["total_images_stored"] = images_stored
-        logger.info("Stored %d product images", images_stored)
+        summary["image_embedding_enabled"] = jina_active
+        logger.info("Stored %d product image records (embedded: %s)", images_stored, jina_active)
         summary["finished_at"] = datetime.utcnow().isoformat()
         logger.info("Ingestion complete: %s", summary)
 

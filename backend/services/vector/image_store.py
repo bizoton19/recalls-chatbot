@@ -1,5 +1,8 @@
 """
-Image vector store — stores and searches CLIP embeddings for recall product images.
+Image vector store — stores and searches Jina CLIP embeddings for recall product images.
+
+All functions return empty results gracefully when Jina is not configured.
+Set JINA_API_KEY in your environment to enable image search.
 """
 import logging
 import uuid
@@ -9,23 +12,23 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.recall import RecallImage, Recall
-from services.vector.clip_embedder import embed_image_url, embed_image_bytes, embed_text_clip, CLIP_DIM
+from services.vector import jina_embedder
 
 logger = logging.getLogger(__name__)
 
-SIMILARITY_THRESHOLD = 0.20  # CLIP cosine similarity — lower threshold than text
+SIMILARITY_THRESHOLD = 0.20
 DEFAULT_TOP_K = 12
 
 
 async def ingest_recall_images(recall: Recall, db: AsyncSession) -> int:
     """
-    Extract image URLs from a recall's raw_data, store them,
-    and CLIP-embed each one. Returns count of images stored.
+    Extract image URLs from a recall's raw_data, store records,
+    and Jina-embed each image when Jina is enabled.
+    Image rows are always persisted; embeddings are added when Jina is available.
     """
     if not recall.raw_data:
         return 0
 
-    # CPSC API returns images nested under Products[].ImageURL or Images[]
     image_urls: list[tuple[str, Optional[str]]] = []
 
     products = recall.raw_data.get("Products") or []
@@ -35,15 +38,13 @@ async def ingest_recall_images(recall: Recall, db: AsyncSession) -> int:
             alt = product.get("Description") or recall.title
             image_urls.append((url, alt))
 
-    # Some recalls also have a top-level Images array
     for img in (recall.raw_data.get("Images") or []):
         url = img.get("URL") or img.get("ImageURL")
         if url and url.startswith("http"):
             image_urls.append((url, img.get("Caption")))
 
     stored = 0
-    for idx, (url, alt) in enumerate(image_urls[:5]):  # cap at 5 images per recall
-        # Check if already stored
+    for idx, (url, alt) in enumerate(image_urls[:5]):
         existing = await db.execute(
             select(RecallImage).where(
                 RecallImage.recall_id == recall.id,
@@ -53,8 +54,9 @@ async def ingest_recall_images(recall: Recall, db: AsyncSession) -> int:
         if existing.scalar_one_or_none():
             continue
 
-        # Fetch and CLIP-embed
-        embedding = await embed_image_url(url)
+        embedding: Optional[list[float]] = None
+        if jina_embedder.is_enabled():
+            embedding = await jina_embedder.embed_image_url(url)
 
         img_row = RecallImage(
             id=uuid.uuid4(),
@@ -77,10 +79,7 @@ async def image_similarity_search(
     db: AsyncSession,
     top_k: int = DEFAULT_TOP_K,
 ) -> list[dict]:
-    """
-    Find the most visually similar recall product images to the query vector.
-    Works for both image-to-image (CLIP image embed) and text-to-image (CLIP text embed).
-    """
+    """Find the most visually similar recall product images to a query vector."""
     vector_literal = f"'[{','.join(str(v) for v in query_vector)}]'::vector"
 
     sql = text(f"""
@@ -124,12 +123,20 @@ async def image_similarity_search(
 
 
 async def search_images_by_text(query: str, db: AsyncSession, top_k: int = DEFAULT_TOP_K) -> list[dict]:
-    """Find recall product images matching a text query using CLIP cross-modal search."""
-    query_vector = await embed_text_clip(query)
+    """Find recall product images matching a text query (cross-modal CLIP search)."""
+    if not jina_embedder.is_enabled():
+        return []
+    query_vector = await jina_embedder.embed_text(query)
+    if not query_vector:
+        return []
     return await image_similarity_search(query_vector, db, top_k=top_k)
 
 
 async def search_images_by_image(image_bytes: bytes, db: AsyncSession, top_k: int = DEFAULT_TOP_K) -> list[dict]:
     """Find recall product images visually similar to an uploaded image."""
-    query_vector = await embed_image_bytes(image_bytes)
+    if not jina_embedder.is_enabled():
+        return []
+    query_vector = await jina_embedder.embed_image_bytes(image_bytes)
+    if not query_vector:
+        return []
     return await image_similarity_search(query_vector, db, top_k=top_k)

@@ -23,11 +23,8 @@ httpx==0.28.1
 # Scheduling
 apscheduler==3.10.4
 
-# Image / CLIP
-torch==2.5.1
-torchvision==0.20.1
-transformers==4.47.1
-Pillow==11.0.0
+# Image upload handling (Jina embeddings via HTTP — no local ML model needed)
+# Set JINA_API_KEY to enable image search. torch/transformers not required.
 python-multipart==0.0.20
 
 # Utilities

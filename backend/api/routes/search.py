@@ -1,10 +1,11 @@
 """
-Unified search API — handles both text and image queries,
-returning two result types: recall cards + image matches.
+Unified search API — text-based semantic recall search.
 
-POST /api/search/image  — upload an image file
-GET  /api/search        — text query returning both result types
+GET  /api/search         — text query, returns ranked recall cards
+GET  /api/search/status  — feature flags (image search enabled when JINA_API_KEY set)
+POST /api/search/image   — upload image; requires JINA_API_KEY (returns 503 when disabled)
 """
+import asyncio
 import base64
 import logging
 from typing import Optional
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import get_db
 from services.vector.store import similarity_search
 from services.vector.image_store import search_images_by_image, search_images_by_text
+from services.vector import jina_embedder
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -25,7 +27,25 @@ ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 
 # ---------------------------------------------------------------------------
-# Text search — returns recalls + image results
+# Feature flag status
+# ---------------------------------------------------------------------------
+
+@router.get("/status")
+async def search_status():
+    """Returns which search features are currently active."""
+    return {
+        "text_search": True,
+        "image_search": jina_embedder.is_enabled(),
+        "image_search_note": (
+            "Set JINA_API_KEY to enable image-to-image and text-to-image visual search."
+            if not jina_embedder.is_enabled()
+            else "Jina CLIP active — image search enabled."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Text search
 # ---------------------------------------------------------------------------
 
 @router.get("")
@@ -35,32 +55,33 @@ async def text_search(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Unified text search over recalls and product images.
-    Returns two result sets:
-      - recalls: ranked recall cards (text RAG)
-      - images:  visually matching product photos (CLIP cross-modal)
+    Semantic text search over recalls using pgvector embeddings.
+    When JINA_API_KEY is set, also returns matching product image results.
     """
-    # Run text RAG search and CLIP image search in parallel
-    import asyncio
-
     recall_task = asyncio.create_task(
         similarity_search(query=q, db=db, top_k=top_k)
     )
-    image_task = asyncio.create_task(
-        search_images_by_text(query=q, db=db, top_k=top_k)
-    )
 
-    recalls, images = await asyncio.gather(recall_task, image_task, return_exceptions=True)
+    recalls, = await asyncio.gather(recall_task, return_exceptions=True)
+
+    # Image search via Jina cross-modal — no-op when Jina is disabled
+    images: list = []
+    if jina_embedder.is_enabled():
+        try:
+            images = await search_images_by_text(query=q, db=db, top_k=top_k)
+        except Exception as e:
+            logger.error("Image search from text failed: %s", e)
 
     return {
         "query": q,
         "recalls": recalls if not isinstance(recalls, Exception) else [],
-        "images": images if not isinstance(images, Exception) else [],
+        "images": images,
+        "image_search_enabled": jina_embedder.is_enabled(),
     }
 
 
 # ---------------------------------------------------------------------------
-# Image upload search
+# Image upload search (requires Jina)
 # ---------------------------------------------------------------------------
 
 @router.post("/image")
@@ -71,34 +92,36 @@ async def image_search(
 ):
     """
     Upload a product photo to find visually similar recalled products.
+    Requires JINA_API_KEY to be set. Returns HTTP 503 when image search is disabled.
 
-    Flow:
-      1. Validate and read uploaded image
-      2. CLIP-embed the image (512-dim vector)
-      3. pgvector similarity search → matching recall product photos
-      4. GPT-4o-mini vision → extract product description from the photo
-      5. Text similarity search using that description → matching recalls
-      6. Return both result sets
+    When enabled:
+      1. Jina CLIP embeds the uploaded image
+      2. pgvector similarity search finds matching recall product photos
+      3. GPT-4o-mini vision extracts a product description
+      4. Text similarity search finds matching recalls
     """
-    # Validate
+    if not jina_embedder.is_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Image search is not enabled. "
+                "Sign up at jina.ai and set the JINA_API_KEY environment variable."
+            ),
+        )
+
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported image type: {file.content_type}. Use JPEG, PNG, or WebP."
+            detail=f"Unsupported image type: {file.content_type}. Use JPEG, PNG, or WebP.",
         )
 
     image_bytes = await file.read()
     if len(image_bytes) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=400, detail="Image too large. Maximum size is 10 MB.")
 
-    import asyncio
-
-    # Run CLIP visual search
     image_results_task = asyncio.create_task(
         search_images_by_image(image_bytes, db, top_k=top_k)
     )
-
-    # Run GPT-4o-mini vision to get product description
     vision_task = asyncio.create_task(
         _describe_image_with_vision(image_bytes)
     )
@@ -108,15 +131,14 @@ async def image_search(
     )
 
     if isinstance(image_results, Exception):
-        logger.error("CLIP search failed: %s", image_results)
+        logger.error("Image similarity search failed: %s", image_results)
         image_results = []
 
     if isinstance(vision_description, Exception):
         logger.error("Vision analysis failed: %s", vision_description)
         vision_description = None
 
-    # Text search using vision description
-    recall_results = []
+    recall_results: list = []
     if vision_description:
         try:
             recall_results = await similarity_search(
@@ -125,7 +147,7 @@ async def image_search(
                 top_k=top_k,
             )
         except Exception as e:
-            logger.error("Text search from vision failed: %s", e)
+            logger.error("Text search from vision description failed: %s", e)
 
     return {
         "vision_description": vision_description,
@@ -134,18 +156,14 @@ async def image_search(
     }
 
 
-async def _describe_image_with_vision(image_bytes: bytes) -> str:
-    """
-    Use GPT-4o-mini vision to extract a product description from an image.
-    Returns a text description suitable for recall search.
-    """
+async def _describe_image_with_vision(image_bytes: bytes) -> Optional[str]:
+    """Use GPT-4o-mini vision to extract a product description from an uploaded image."""
     if not settings.openai_api_key:
-        return ""
+        return None
 
     from openai import AsyncOpenAI
 
     client = AsyncOpenAI(api_key=settings.openai_api_key)
-
     b64 = base64.b64encode(image_bytes).decode("utf-8")
 
     response = await client.chat.completions.create(
@@ -159,13 +177,13 @@ async def _describe_image_with_vision(image_bytes: bytes) -> str:
                         "type": "image_url",
                         "image_url": {
                             "url": f"data:image/jpeg;base64,{b64}",
-                            "detail": "low",  # cheaper, sufficient for product ID
+                            "detail": "low",
                         },
                     },
                     {
                         "type": "text",
                         "text": (
-                            "Describe this consumer product in 1–2 sentences focusing on: "
+                            "Describe this consumer product in 1-2 sentences focusing on: "
                             "product type, brand name (if visible), color, material, and any "
                             "model numbers or labels you can read. Be specific and factual. "
                             "Do not mention recalls — only describe what you see."
