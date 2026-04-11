@@ -3,8 +3,10 @@ LLM provider abstraction using LangChain.
 Switch providers by setting LLM_PROVIDER env var:
 
   openai    → gpt-4o-mini (default)
+  google    → gemini-2.0-flash
   anthropic → claude-3-5-haiku-20241022
   groq      → llama-3.3-70b-versatile
+  openrouter→ any model via openrouter.ai (OpenAI-compatible)
   ollama    → llama3.2 (self-hosted)
 """
 import os
@@ -29,6 +31,15 @@ def get_llm(temperature: float = 0.2, streaming: bool = False) -> BaseChatModel:
             api_key=os.environ["OPENAI_API_KEY"],
         )
 
+    elif PROVIDER == "google":
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=MODEL or "gemini-2.0-flash",
+            temperature=temperature,
+            google_api_key=os.environ["GOOGLE_API_KEY"],
+            # Gemini streaming works differently — LangChain handles it transparently
+        )
+
     elif PROVIDER == "anthropic":
         from langchain_anthropic import ChatAnthropic
         return ChatAnthropic(
@@ -47,6 +58,21 @@ def get_llm(temperature: float = 0.2, streaming: bool = False) -> BaseChatModel:
             api_key=os.environ["GROQ_API_KEY"],
         )
 
+    elif PROVIDER == "openrouter":
+        # OpenRouter exposes an OpenAI-compatible API — supports Qwen, Kimi, Mistral, etc.
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            model=MODEL,
+            temperature=temperature,
+            streaming=streaming,
+            api_key=os.environ["OPENROUTER_API_KEY"],
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": os.getenv("APP_URL", "https://recalls-chatbot.up.railway.app"),
+                "X-Title": "CPSC Recalls Chatbot",
+            },
+        )
+
     elif PROVIDER == "ollama":
         from langchain_ollama import ChatOllama
         return ChatOllama(
@@ -56,4 +82,7 @@ def get_llm(temperature: float = 0.2, streaming: bool = False) -> BaseChatModel:
         )
 
     else:
-        raise ValueError(f"Unknown LLM_PROVIDER: {PROVIDER!r}. Choose: openai, anthropic, groq, ollama")
+        raise ValueError(
+            f"Unknown LLM_PROVIDER: {PROVIDER!r}. "
+            "Choose: openai, google, anthropic, groq, openrouter, ollama"
+        )

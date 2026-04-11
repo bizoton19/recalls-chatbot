@@ -13,6 +13,7 @@ langchain-openai==0.2.14
 langchain-anthropic==0.3.3
 langchain-groq==0.2.3
 langchain-ollama==0.2.3
+langchain-google-genai==2.0.10
 
 # OpenAI SDK (also used directly for embeddings)
 openai==1.58.1
