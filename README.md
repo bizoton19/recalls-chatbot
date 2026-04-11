@@ -1,6 +1,6 @@
-# Recalls Chatbot
+# CPSC Recalls Chatbot
 
-AI-powered federal recall search and conversational assistant. Aggregates recall data from CPSC, NHTSA, FDA, and USDA, indexes it with pgvector, and provides a natural-language chat interface powered by LangChain.
+AI-powered consumer product recall search and conversational assistant. Indexes CPSC recall data from saferproducts.gov with pgvector and provides a natural-language chat interface powered by LangChain.
 
 ## Architecture
 
@@ -58,14 +58,11 @@ Change `LLM_PROVIDER` in `.env` — no code changes needed:
 | GET | `/api/admin/stats` | Index statistics |
 | GET | `/health` | Health check |
 
-## Data Sources
+## Data Source
 
 | Agency | Data | Source |
 |--------|------|--------|
 | CPSC | Consumer products | saferproducts.gov/RestWebServices/Recall |
-| NHTSA | Vehicles & tires | api.nhtsa.gov |
-| FDA | Food, drugs, devices, cosmetics | api.fda.gov (openFDA) |
-| USDA/FSIS | Meat, poultry, eggs | fsis.usda.gov/fsis/api/recall |
 
 ## Standards
 

@@ -17,12 +17,7 @@ CREATE TABLE IF NOT EXISTS agencies (
 );
 
 INSERT INTO agencies (code, name, url, api_url) VALUES
-    ('CPSC',  'Consumer Product Safety Commission',   'https://www.cpsc.gov',              'https://www.saferproducts.gov/RestWebServices/Recall'),
-    ('NHTSA', 'National Highway Traffic Safety Admin','https://www.nhtsa.gov',             'https://api.nhtsa.gov/recalls/recallsByVehicle'),
-    ('FDA',   'Food and Drug Administration',         'https://www.fda.gov',               'https://api.fda.gov/food/enforcement.json'),
-    ('USDA',  'U.S. Dept of Agriculture',             'https://www.fsis.usda.gov',         'https://www.fsis.usda.gov/fsis/api/recall/v/1'),
-    ('EPA',   'Environmental Protection Agency',      'https://www.epa.gov',               NULL),
-    ('USCG',  'U.S. Coast Guard',                     'https://www.uscgboating.org',       NULL)
+    ('CPSC', 'Consumer Product Safety Commission', 'https://www.cpsc.gov', 'https://www.saferproducts.gov/RestWebServices/Recall')
 ON CONFLICT (code) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
