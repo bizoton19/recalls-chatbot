@@ -1,18 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getLatestRecalls, searchRecalls, type Recall } from "@/lib/api";
-
-const PRODUCT_FILTERS = [
-  { label: "All", value: "" },
-  { label: "Toys & Children", value: "children" },
-  { label: "Furniture", value: "furniture" },
-  { label: "Electronics", value: "electronics" },
-  { label: "Appliances", value: "appliances" },
-  { label: "Clothing", value: "clothing" },
-  { label: "Sports & Recreation", value: "sports" },
-];
+import { getLatestRecalls, type Recall } from "@/lib/api";
 
 export default function HomePage() {
   const router = useRouter();
@@ -20,47 +10,23 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
-  const [isSearchResults, setIsSearchResults] = useState(false);
-  const [productFilter, setProductFilter] = useState("");
 
-  const loadLatest = useCallback(async () => {
-    setLoading(true);
-    setIsSearchResults(false);
-    try {
-      const data = await getLatestRecalls(24);
-      setRecalls(data);
-    } catch {
-      setRecalls([]);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    getLatestRecalls(15)
+      .then((data) => setRecalls(data))
+      .catch(() => setRecalls([]))
+      .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { loadLatest(); }, [loadLatest]);
-
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = query.trim();
-    if (!q) return loadLatest();
-
-    setSearching(true);
-    setIsSearchResults(true);
-    try {
-      const data = await searchRecalls(q, 12);
-      setRecalls(data);
-    } catch {
-      setRecalls([]);
-    } finally {
-      setSearching(false);
-    }
+    if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
+    else router.push("/search");
   };
 
   const goToChat = () => {
-    if (query.trim()) {
-      router.push(`/chat?q=${encodeURIComponent(query.trim())}`);
-    } else {
-      router.push("/chat");
-    }
+    router.push(query.trim() ? `/chat?q=${encodeURIComponent(query.trim())}` : "/chat");
   };
 
   return (
@@ -88,20 +54,19 @@ export default function HomePage() {
                 aria-label="Search recalls"
               />
               <button type="submit" disabled={searching} aria-label="Search">
-                {searching ? "Searching..." : "Search"}
+                {searching ? "Searching…" : "Search"}
               </button>
               <button
                 type="button"
                 onClick={goToChat}
                 style={{ background: "#1a5e1a", borderRadius: 6, padding: "0.65rem 1.1rem", color: "#fff", border: "none", fontWeight: 600, cursor: "pointer" }}
-                aria-label="Ask the AI assistant about this recall"
+                aria-label="Ask the AI assistant"
               >
                 Ask AI
               </button>
             </div>
           </form>
 
-          {/* Quick stats */}
           <div style={{ display: "flex", gap: "2rem", marginTop: "1.5rem", flexWrap: "wrap" }}>
             {[
               { label: "Active CPSC Recalls", value: "8,000+" },
@@ -117,164 +82,318 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Content */}
-      <section className="grid-container" style={{ paddingTop: "2rem", paddingBottom: "3rem" }}>
-
-        {/* Filter tabs */}
-        {!isSearchResults && (
-          <div role="tablist" aria-label="Filter by product category" style={{ display: "flex", gap: ".5rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
-            {PRODUCT_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                role="tab"
-                aria-selected={productFilter === f.value}
-                onClick={() => setProductFilter(f.value)}
-                style={{
-                  padding: ".35rem .9rem",
-                  border: "1.5px solid",
-                  borderRadius: 999,
-                  fontSize: ".875rem",
-                  cursor: "pointer",
-                  fontWeight: productFilter === f.value ? 700 : 400,
-                  borderColor: productFilter === f.value ? "#005288" : "#c9c9c9",
-                  background: productFilter === f.value ? "#005288" : "#fff",
-                  color: productFilter === f.value ? "#fff" : "#1b1b1b",
-                  transition: "all .1s",
-                }}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Section heading */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: ".5rem" }}>
-          <h2 style={{ fontSize: "1.15rem", fontWeight: 700, color: "#1b1b1b", margin: 0 }}>
-            {isSearchResults
-              ? `Search results for "${query}" (${recalls.length} found)`
-              : "Latest CPSC Recalls"}
+      {/* Latest Recalls Carousel */}
+      <section
+        className="grid-container"
+        style={{ paddingTop: "2rem", paddingBottom: "3rem" }}
+        aria-labelledby="latest-heading"
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+          <h2 id="latest-heading" style={{ fontSize: "1.15rem", fontWeight: 700, color: "#1b1b1b", margin: 0 }}>
+            Latest CPSC Recalls
           </h2>
-          {isSearchResults && (
-            <button
-              onClick={loadLatest}
-              style={{ fontSize: ".85rem", color: "#005288", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
-            >
-              Clear search
-            </button>
-          )}
+          <a
+            href="/search"
+            style={{ fontSize: ".85rem", color: "#005288", textDecoration: "none", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}
+          >
+            View all
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </a>
         </div>
 
-        {/* Alert */}
-        <div className="recall-alert" role="note">
-          <strong>Safety tip:</strong> If you have an affected product, stop using it immediately and follow the remedy instructions.
-          Call the CPSC hotline at <a href="tel:800-638-2772">800-638-2772</a> for assistance.
-        </div>
-
-        {/* Cards */}
-        {loading || searching ? (
-          <div className="usa-alert usa-alert--info" role="status" aria-live="polite">
-            <div className="usa-alert__body">
-              <p className="usa-alert__text">Loading recalls...</p>
-            </div>
-          </div>
+        {loading ? (
+          <RecallCarouselSkeleton />
         ) : recalls.length === 0 ? (
-          <div className="usa-alert usa-alert--warning">
-            <div className="usa-alert__body">
-              <p className="usa-alert__text">
-                No recalls found.{" "}
-                <button
-                  onClick={goToChat}
-                  style={{ color: "#005288", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontSize: "inherit" }}
-                >
-                  Try asking the AI assistant
-                </button>{" "}
-                for more specific queries.
-              </p>
-            </div>
-          </div>
+          <p style={{ color: "#565c65", fontSize: ".9rem" }}>No recalls found yet — data is being indexed.</p>
         ) : (
-          <div className="recalls-grid">
-            {recalls
-              .filter((r) => !productFilter || (r.product_type?.toLowerCase().includes(productFilter) || r.title.toLowerCase().includes(productFilter)))
-              .map((recall) => (
-                <RecallCard key={recall.id} recall={recall} />
-              ))}
-          </div>
+          <RecallCarousel recalls={recalls} />
         )}
 
-        {/* CTA */}
-        <div style={{ marginTop: "2.5rem", textAlign: "center", display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
-          <a href="/search" className="usa-button usa-button--outline">
-            Search by Product Image
-          </a>
-          <a href="/chat" className="usa-button">
-            Ask the Recall Assistant
-          </a>
+        <div style={{ marginTop: "2rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+          <a href="/search" className="usa-button usa-button--outline">Search by Image</a>
+          <a href="/chat" className="usa-button">Ask the Recall Assistant</a>
         </div>
       </section>
     </>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Horizontal drag-scroll carousel
+// ---------------------------------------------------------------------------
+
+function RecallCarousel({ recalls }: { recalls: Recall[] }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    startX.current = e.pageX - (trackRef.current?.offsetLeft ?? 0);
+    scrollLeft.current = trackRef.current?.scrollLeft ?? 0;
+    if (trackRef.current) trackRef.current.style.cursor = "grabbing";
+  };
+
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging.current || !trackRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - trackRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.2;
+    trackRef.current.scrollLeft = scrollLeft.current - walk;
+  }, []);
+
+  const onMouseUp = useCallback(() => {
+    isDragging.current = false;
+    if (trackRef.current) trackRef.current.style.cursor = "grab";
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [onMouseMove, onMouseUp]);
+
+  const scrollBy = (dir: -1 | 1) => {
+    trackRef.current?.scrollBy({ left: dir * 300, behavior: "smooth" });
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      {/* Left arrow */}
+      <CarouselArrow dir="left" onClick={() => scrollBy(-1)} />
+
+      {/* Scrollable track */}
+      <div
+        ref={trackRef}
+        onMouseDown={onMouseDown}
+        role="list"
+        aria-label="Latest CPSC recalls"
+        style={{
+          display: "flex",
+          gap: "1rem",
+          overflowX: "auto",
+          scrollSnapType: "x mandatory",
+          WebkitOverflowScrolling: "touch",
+          paddingBottom: "1rem",
+          cursor: "grab",
+          userSelect: "none",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+        } as React.CSSProperties}
+      >
+        {recalls.map((recall) => (
+          <RecallCard key={recall.id} recall={recall} />
+        ))}
+      </div>
+
+      {/* Right arrow */}
+      <CarouselArrow dir="right" onClick={() => scrollBy(1)} />
+
+      <style>{`
+        [role="list"]::-webkit-scrollbar { display: none; }
+      `}</style>
+    </div>
+  );
+}
+
+function CarouselArrow({ dir, onClick }: { dir: "left" | "right"; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={dir === "left" ? "Scroll left" : "Scroll right"}
+      style={{
+        position: "absolute",
+        top: "50%",
+        transform: "translateY(-60%)",
+        [dir === "left" ? "left" : "right"]: -20,
+        zIndex: 2,
+        background: "#fff",
+        border: "1.5px solid #dfe1e2",
+        borderRadius: "50%",
+        width: 36,
+        height: 36,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        boxShadow: "0 2px 8px rgba(0,0,0,.12)",
+        padding: 0,
+        color: "#005288",
+      }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+        <polyline points={dir === "left" ? "15 18 9 12 15 6" : "9 18 15 12 9 6"} />
+      </svg>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Single recall card
+// ---------------------------------------------------------------------------
+
 function RecallCard({ recall }: { recall: Recall }) {
+  const [imgError, setImgError] = useState(false);
+
   const date = recall.recall_date
     ? new Date(recall.recall_date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
     : null;
 
+  const product = recall.product_name || recall.brand_name || recall.product_type || null;
+
   return (
-    <article className="recall-card" aria-labelledby={`recall-title-${recall.id}`}>
-      <div className="recall-card__agency" aria-label={`Agency: ${recall.agency_code}`}>
-        <svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-          <polyline points="9 22 9 12 15 12 15 22"/>
-        </svg>
-        CPSC
+    <article
+      role="listitem"
+      style={{
+        flex: "0 0 260px",
+        scrollSnapAlign: "start",
+        background: "#fff",
+        border: "1px solid #dfe1e2",
+        borderRadius: 8,
+        overflow: "hidden",
+        boxShadow: "0 1px 4px rgba(0,0,0,.08)",
+        display: "flex",
+        flexDirection: "column",
+        transition: "box-shadow .15s, transform .15s",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 16px rgba(0,0,0,.14)";
+        (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 4px rgba(0,0,0,.08)";
+        (e.currentTarget as HTMLElement).style.transform = "";
+      }}
+    >
+      {/* Image */}
+      <div style={{ width: "100%", aspectRatio: "4/3", background: "#f0f4f7", position: "relative", overflow: "hidden", flexShrink: 0 }}>
+        {recall.image_url && !imgError ? (
+          <img
+            src={recall.image_url}
+            alt={product || recall.title}
+            onError={() => setImgError(true)}
+            draggable={false}
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        ) : (
+          <PlaceholderImage />
+        )}
+        {/* CPSC badge */}
+        <div style={{
+          position: "absolute",
+          top: 8,
+          left: 8,
+          background: "rgba(0,82,136,.9)",
+          color: "#fff",
+          fontSize: ".65rem",
+          fontWeight: 700,
+          letterSpacing: ".06em",
+          padding: "2px 7px",
+          borderRadius: 3,
+        }}>
+          CPSC
+        </div>
       </div>
 
-      <h3 className="recall-card__title" id={`recall-title-${recall.id}`}>
-        {recall.title}
-      </h3>
-
-      <p className="recall-card__meta">
-        {[
-          recall.brand_name,
-          recall.manufacturer,
-          date,
-          recall.units_affected ? `${recall.units_affected.toLocaleString()} units` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </p>
-
-      {recall.hazard && (
-        <p className="recall-card__hazard" role="note" aria-label="Hazard">
-          <strong>Hazard:</strong> {recall.hazard}
+      {/* Body */}
+      <div style={{ padding: "0.85rem 0.9rem 0.75rem", display: "flex", flexDirection: "column", gap: "0.35rem", flex: 1 }}>
+        {/* Title */}
+        <p style={{
+          margin: 0,
+          fontSize: ".8rem",
+          fontWeight: 700,
+          color: "#1b1b1b",
+          lineHeight: 1.4,
+          display: "-webkit-box",
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        } as React.CSSProperties}>
+          {recall.title}
         </p>
-      )}
 
-      {recall.remedy && (
-        <p className="recall-card__remedy" role="note" aria-label="Remedy">
-          <strong>Remedy:</strong> {recall.remedy}
-        </p>
-      )}
+        {/* Product + date */}
+        <div style={{ fontSize: ".72rem", color: "#565c65", marginTop: 2 }}>
+          {product && <span style={{ display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{product}</span>}
+          {date && <span>{date}</span>}
+        </div>
 
-      {recall.url && (
-        <a
-          className="recall-card__link"
-          href={recall.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`More details about ${recall.title} (opens in new tab)`}
-        >
-          Full recall details
-          <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 4 }}>
-            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
-            <polyline points="15 3 21 3 21 9"/>
-            <line x1="10" y1="14" x2="21" y2="3"/>
-          </svg>
-        </a>
-      )}
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Link */}
+        {recall.url ? (
+          <a
+            href={recall.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Full recall details for ${recall.title} (opens CPSC.gov)`}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: ".75rem",
+              color: "#005288",
+              fontWeight: 600,
+              textDecoration: "none",
+              marginTop: "0.5rem",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+          >
+            Full details on CPSC.gov
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </a>
+        ) : null}
+      </div>
     </article>
+  );
+}
+
+function PlaceholderImage() {
+  return (
+    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#e8f1f7" }}>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9eb8cc" strokeWidth="1.5" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <polyline points="21 15 16 10 5 21" />
+      </svg>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loading skeleton
+// ---------------------------------------------------------------------------
+
+function RecallCarouselSkeleton() {
+  return (
+    <div style={{ display: "flex", gap: "1rem", overflowX: "hidden" }} aria-busy="true" aria-label="Loading recalls">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} style={{ flex: "0 0 260px", borderRadius: 8, overflow: "hidden", border: "1px solid #dfe1e2" }}>
+          <div style={{ width: "100%", aspectRatio: "4/3", background: "#e8edf0", animation: "skeleton-pulse 1.4s ease-in-out infinite" }} />
+          <div style={{ padding: "0.85rem 0.9rem" }}>
+            <div style={{ height: 12, background: "#e8edf0", borderRadius: 4, marginBottom: 8, animation: "skeleton-pulse 1.4s ease-in-out infinite", animationDelay: `${i * .1}s` }} />
+            <div style={{ height: 12, background: "#e8edf0", borderRadius: 4, width: "70%", animation: "skeleton-pulse 1.4s ease-in-out infinite", animationDelay: `${i * .1 + .1}s` }} />
+          </div>
+        </div>
+      ))}
+      <style>{`
+        @keyframes skeleton-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: .4; }
+        }
+      `}</style>
+    </div>
   );
 }

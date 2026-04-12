@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from db.database import get_db
 from models.recall import Recall
@@ -19,6 +20,7 @@ async def get_latest_recalls(
     """Return the most recent CPSC recalls, optionally filtered by product type."""
     q = (
         select(Recall)
+        .options(selectinload(Recall.images))
         .where(Recall.agency_code == "CPSC")
         .order_by(desc(Recall.recall_date), desc(Recall.created_at))
         .limit(limit)
@@ -68,6 +70,13 @@ async def get_recall(recall_id: str, db: AsyncSession = Depends(get_db)):
 
 
 def _serialize(r: Recall) -> dict:
+    # Pick the first image by image_index if available
+    first_image = None
+    if hasattr(r, "images") and r.images:
+        sorted_imgs = sorted(r.images, key=lambda i: i.image_index)
+        if sorted_imgs:
+            first_image = sorted_imgs[0].image_url
+
     return {
         "id": str(r.id),
         "agency_code": r.agency_code,
@@ -89,4 +98,5 @@ def _serialize(r: Recall) -> dict:
         "classification": r.classification,
         "units_affected": r.units_affected,
         "url": r.url,
+        "image_url": first_image,
     }

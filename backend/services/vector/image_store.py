@@ -12,7 +12,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.recall import RecallImage, Recall
-from services.vector import jina_embedder
+from services.vector import clip_embedder as jina_embedder  # drop-in replacement
 
 logger = logging.getLogger(__name__)
 

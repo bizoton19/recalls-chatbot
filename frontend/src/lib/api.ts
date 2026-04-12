@@ -21,6 +21,7 @@ export interface Recall {
   manufacturer: string | null;
   units_affected: number | null;
   url: string | null;
+  image_url: string | null;
   similarity?: number;
 }
 
