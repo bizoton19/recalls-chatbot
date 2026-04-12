@@ -3,6 +3,7 @@ LLM provider abstraction using LangChain.
 Switch providers by setting LLM_PROVIDER env var:
 
   openai    → gpt-4o-mini (default)
+  azure     → gpt-4o-mini via Azure AI Foundry (AzureChatOpenAI)
   google    → gemini-2.0-flash
   anthropic → claude-3-5-haiku-20241022
   groq      → llama-3.3-70b-versatile
@@ -29,6 +30,23 @@ def get_llm(temperature: float = 0.2, streaming: bool = False) -> BaseChatModel:
             temperature=temperature,
             streaming=streaming,
             api_key=os.environ["OPENAI_API_KEY"],
+        )
+
+    elif PROVIDER == "azure":
+        # Azure AI Foundry / Azure OpenAI Service
+        # Required env vars:
+        #   AZURE_OPENAI_API_KEY    — your Azure key
+        #   AZURE_OPENAI_ENDPOINT   — https://<resource>.openai.azure.com/
+        #   AZURE_OPENAI_DEPLOYMENT — deployment name (e.g. "gpt-4o-mini")
+        #   AZURE_OPENAI_API_VERSION — e.g. "2024-08-01-preview" (optional)
+        from langchain_openai import AzureChatOpenAI
+        return AzureChatOpenAI(
+            azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT", MODEL),
+            azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+            api_key=os.environ["AZURE_OPENAI_API_KEY"],
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview"),
+            temperature=temperature,
+            streaming=streaming,
         )
 
     elif PROVIDER == "google":
@@ -84,5 +102,5 @@ def get_llm(temperature: float = 0.2, streaming: bool = False) -> BaseChatModel:
     else:
         raise ValueError(
             f"Unknown LLM_PROVIDER: {PROVIDER!r}. "
-            "Choose: openai, google, anthropic, groq, openrouter, ollama"
+            "Choose: openai, azure, google, anthropic, groq, openrouter, ollama"
         )
