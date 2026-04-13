@@ -1,8 +1,8 @@
 """
-Image vector store — stores and searches Jina CLIP embeddings for recall product images.
+Image vector store — stores and searches CLIP embeddings for recall product images.
 
-All functions return empty results gracefully when Jina is not configured.
-Set JINA_API_KEY in your environment to enable image search.
+Uses `clip_embedder` (CLIP_SERVICE_URL → local clip-service). All functions return
+empty results gracefully when CLIP is not configured.
 """
 import logging
 import uuid
@@ -12,7 +12,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.recall import RecallImage, Recall
-from services.vector import clip_embedder as jina_embedder  # drop-in replacement
+from services.vector import clip_embedder as _clip  # module historically aliased; local CLIP only
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +23,8 @@ DEFAULT_TOP_K = 12
 async def ingest_recall_images(recall: Recall, db: AsyncSession) -> int:
     """
     Extract image URLs from a recall's raw_data, store records,
-    and Jina-embed each image when Jina is enabled.
-    Image rows are always persisted; embeddings are added when Jina is available.
+    and embed each image when the CLIP service is available.
+    Image rows are always persisted; embeddings are added when CLIP is reachable.
     """
     if not recall.raw_data:
         return 0
@@ -55,8 +55,8 @@ async def ingest_recall_images(recall: Recall, db: AsyncSession) -> int:
             continue
 
         embedding: Optional[list[float]] = None
-        if jina_embedder.is_enabled():
-            embedding = await jina_embedder.embed_image_url(url)
+        if _clip.is_enabled():
+            embedding = await _clip.embed_image_url(url)
 
         img_row = RecallImage(
             id=uuid.uuid4(),
@@ -124,9 +124,9 @@ async def image_similarity_search(
 
 async def search_images_by_text(query: str, db: AsyncSession, top_k: int = DEFAULT_TOP_K) -> list[dict]:
     """Find recall product images matching a text query (cross-modal CLIP search)."""
-    if not jina_embedder.is_enabled():
+    if not _clip.is_enabled():
         return []
-    query_vector = await jina_embedder.embed_text(query)
+    query_vector = await _clip.embed_text(query)
     if not query_vector:
         return []
     return await image_similarity_search(query_vector, db, top_k=top_k)
@@ -134,9 +134,9 @@ async def search_images_by_text(query: str, db: AsyncSession, top_k: int = DEFAU
 
 async def search_images_by_image(image_bytes: bytes, db: AsyncSession, top_k: int = DEFAULT_TOP_K) -> list[dict]:
     """Find recall product images visually similar to an uploaded image."""
-    if not jina_embedder.is_enabled():
+    if not _clip.is_enabled():
         return []
-    query_vector = await jina_embedder.embed_image_bytes(image_bytes)
+    query_vector = await _clip.embed_image_bytes(image_bytes)
     if not query_vector:
         return []
     return await image_similarity_search(query_vector, db, top_k=top_k)

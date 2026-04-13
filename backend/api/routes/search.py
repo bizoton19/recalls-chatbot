@@ -2,8 +2,8 @@
 Unified search API — text-based semantic recall search.
 
 GET  /api/search         — text query, returns ranked recall cards
-GET  /api/search/status  — feature flags (image search enabled when JINA_API_KEY set)
-POST /api/search/image   — upload image; requires JINA_API_KEY (returns 503 when disabled)
+GET  /api/search/status  — feature flags (image search when CLIP_SERVICE_URL or JINA_API_KEY)
+POST /api/search/image   — upload image; needs CLIP/Jina for embeddings (503 when disabled)
 """
 import asyncio
 import base64
@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import get_db
 from services.vector.store import similarity_search
 from services.vector.image_store import search_images_by_image, search_images_by_text
+from services.vector import clip_embedder
 from services.vector import jina_embedder
 from config import settings
 
@@ -24,6 +25,22 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
+def _image_search_enabled() -> bool:
+    """True when embeddings can be computed (local clip-service or Jina API)."""
+    return clip_embedder.is_enabled() or jina_embedder.is_enabled()
+
+
+def _image_search_status_note() -> str:
+    if not _image_search_enabled():
+        return (
+            "Set CLIP_SERVICE_URL (local clip-service) or JINA_API_KEY for "
+            "image-to-image and text-to-image visual search."
+        )
+    if clip_embedder.is_enabled():
+        return "Local CLIP service — image search enabled."
+    return "Jina CLIP active — image search enabled."
 
 
 # ---------------------------------------------------------------------------
@@ -35,12 +52,8 @@ async def search_status():
     """Returns which search features are currently active."""
     return {
         "text_search": True,
-        "image_search": jina_embedder.is_enabled(),
-        "image_search_note": (
-            "Set JINA_API_KEY to enable image-to-image and text-to-image visual search."
-            if not jina_embedder.is_enabled()
-            else "Jina CLIP active — image search enabled."
-        ),
+        "image_search": _image_search_enabled(),
+        "image_search_note": _image_search_status_note(),
     }
 
 
@@ -56,7 +69,7 @@ async def text_search(
 ):
     """
     Semantic text search over recalls using pgvector embeddings.
-    When JINA_API_KEY is set, also returns matching product image results.
+    When CLIP (local or Jina) is configured, also returns matching product image results.
     """
     recall_task = asyncio.create_task(
         similarity_search(query=q, db=db, top_k=top_k)
@@ -64,9 +77,9 @@ async def text_search(
 
     recalls, = await asyncio.gather(recall_task, return_exceptions=True)
 
-    # Image search via Jina cross-modal — no-op when Jina is disabled
+    # Image search via CLIP cross-modal — no-op when neither local CLIP nor Jina is configured
     images: list = []
-    if jina_embedder.is_enabled():
+    if _image_search_enabled():
         try:
             images = await search_images_by_text(query=q, db=db, top_k=top_k)
         except Exception as e:
@@ -76,12 +89,12 @@ async def text_search(
         "query": q,
         "recalls": recalls if not isinstance(recalls, Exception) else [],
         "images": images,
-        "image_search_enabled": jina_embedder.is_enabled(),
+        "image_search_enabled": _image_search_enabled(),
     }
 
 
 # ---------------------------------------------------------------------------
-# Image upload search (requires Jina)
+# Image upload search (requires CLIP embeddings: local clip-service or Jina)
 # ---------------------------------------------------------------------------
 
 @router.post("/image")
@@ -92,20 +105,20 @@ async def image_search(
 ):
     """
     Upload a product photo to find visually similar recalled products.
-    Requires JINA_API_KEY to be set. Returns HTTP 503 when image search is disabled.
+    Requires CLIP_SERVICE_URL (local) or JINA_API_KEY. Returns HTTP 503 when disabled.
 
     When enabled:
-      1. Jina CLIP embeds the uploaded image
+      1. CLIP embeds the uploaded image
       2. pgvector similarity search finds matching recall product photos
-      3. GPT-4o-mini vision extracts a product description
+      3. Vision (OpenAI/Gemini if configured) extracts a product description
       4. Text similarity search finds matching recalls
     """
-    if not jina_embedder.is_enabled():
+    if not _image_search_enabled():
         raise HTTPException(
             status_code=503,
             detail=(
-                "Image search is not enabled. "
-                "Sign up at jina.ai and set the JINA_API_KEY environment variable."
+                "Image search is not enabled. Set CLIP_SERVICE_URL to your clip-service "
+                "(e.g. http://clip-service:8001) or set JINA_API_KEY for Jina embeddings."
             ),
         )
 
