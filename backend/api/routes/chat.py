@@ -5,11 +5,12 @@ POST /api/chat/session          — create a new chat session
 POST /api/chat/{session_token}  — send a message, get a streaming response
 GET  /api/chat/{session_token}/history — fetch message history
 """
+import json
 import logging
 import secrets
 import uuid
 from datetime import datetime
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -21,6 +22,7 @@ from db.database import get_db
 from models.recall import ChatSession, ChatMessage
 from services.vector.store import similarity_search
 from services.llm.rag_chain import answer, format_recalls_context
+from services.llm.router import classify_intent, dispatch_sql_tool, format_tool_context
 
 logger = logging.getLogger(__name__)
 
@@ -71,19 +73,36 @@ async def send_message(
 
     # Retrieve conversation history
     history = await _get_history(session.id, db)
+    history_dicts = [{"role": m.role, "content": m.content} for m in history]
 
-    # Semantic search: find relevant recalls (best-effort — empty list if not indexed yet)
-    agency_filter = body.agencies if body.agencies else None
-    try:
-        recalls = await similarity_search(
-            query=body.message,
-            db=db,
-            top_k=8,
-            agency_codes=agency_filter,
-        )
-    except Exception as e:
-        logger.warning("Similarity search failed (embeddings may not be ready): %s", e)
-        recalls = []
+    # Route based on intent
+    intent = classify_intent(body.message)
+    recalls: list[dict] = []
+    chart: Optional[dict] = None
+    context_override: Optional[str] = None
+
+    if intent in ("count", "chart"):
+        try:
+            tool_result = await dispatch_sql_tool(body.message, db)
+            context_override = format_tool_context(tool_result)
+            chart = tool_result.get("chart")
+            logger.info("SQL tool=%s intent=%s", tool_result.get("tool"), intent)
+        except Exception as e:
+            logger.warning("SQL tool failed, falling back to RAG: %s", e)
+
+    if context_override is None:
+        # Semantic search fallback (also used when SQL tool fails)
+        agency_filter = body.agencies if body.agencies else None
+        try:
+            recalls = await similarity_search(
+                query=body.message,
+                db=db,
+                top_k=8,
+                agency_codes=agency_filter,
+            )
+        except Exception as e:
+            logger.warning("Similarity search failed: %s", e)
+            recalls = []
 
     # Save user message
     user_msg = ChatMessage(
@@ -95,23 +114,18 @@ async def send_message(
     db.add(user_msg)
     await db.flush()
 
-    # Update session activity
     await db.execute(
         update(ChatSession)
         .where(ChatSession.id == session.id)
         .values(last_active_at=datetime.utcnow())
     )
 
-    history_dicts = [{"role": m.role, "content": m.content} for m in history]
-
     if body.stream:
         return StreamingResponse(
-            _stream_response(body.message, recalls, history_dicts, session.id, db),
+            _stream_response(body.message, recalls, history_dicts, session.id, db,
+                             context_override=context_override, chart=chart),
             media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",
-            },
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
     else:
         try:
@@ -120,6 +134,7 @@ async def send_message(
                 recalls=recalls,
                 history=history_dicts,
                 streaming=False,
+                context_override=context_override,
             )
         except Exception as e:
             _raise_llm_error(e)
@@ -127,6 +142,7 @@ async def send_message(
         return {
             "response": response_text,
             "sources": _sources(recalls),
+            "chart": chart,
             "session_token": session_token,
         }
 
@@ -137,10 +153,22 @@ async def _stream_response(
     history: list[dict],
     session_id: uuid.UUID,
     db: AsyncSession,
+    context_override: Optional[str] = None,
+    chart: Optional[dict] = None,
 ) -> AsyncIterator[str]:
     """Stream response tokens as SSE, then persist the full message."""
+    # Emit chart data before text so the frontend can render it immediately
+    if chart:
+        yield f"event: chart\ndata: {json.dumps(chart)}\n\n"
+
     try:
-        stream = await answer(question=question, recalls=recalls, history=history, streaming=True)
+        stream = await answer(
+            question=question,
+            recalls=recalls,
+            history=history,
+            streaming=True,
+            context_override=context_override,
+        )
         full_response = ""
         async for token in stream:
             full_response += token

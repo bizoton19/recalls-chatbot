@@ -25,11 +25,21 @@ export interface Recall {
   similarity?: number;
 }
 
+export interface ChartSpec {
+  type: "bar" | "pie" | "line";
+  title: string;
+  labels: string[];
+  data: number[];
+  x_label?: string;
+  y_label?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   sources?: RecallSource[];
+  chart?: ChartSpec;
   created_at: string;
 }
 
@@ -123,8 +133,9 @@ export function streamChatMessage(
   sessionToken: string,
   message: string,
   onToken: (token: string) => void,
-  onDone: (sources: RecallSource[]) => void,
-  onError: (err: Error) => void
+  onDone: (sources: RecallSource[], chart?: ChartSpec) => void,
+  onError: (err: Error) => void,
+  onChart?: (chart: ChartSpec) => void
 ): () => void {
   let aborted = false;
 
@@ -143,6 +154,8 @@ export function streamChatMessage(
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let currentEvent = "";
+      let pendingChart: ChartSpec | undefined;
 
       while (!aborted) {
         const { done, value } = await reader.read();
@@ -153,11 +166,21 @@ export function streamChatMessage(
         buffer = lines.pop() ?? "";
 
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const token = line.slice(6);
-            if (token) onToken(token);
-          } else if (line.startsWith("event: done")) {
-            onDone([]);
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            const payload = line.slice(6);
+            if (currentEvent === "chart") {
+              try {
+                pendingChart = JSON.parse(payload);
+                if (onChart && pendingChart) onChart(pendingChart);
+              } catch { /* ignore */ }
+            } else if (currentEvent === "done" || payload === "") {
+              onDone([], pendingChart);
+            } else {
+              if (payload) onToken(payload);
+            }
+            currentEvent = "";
           }
         }
       }

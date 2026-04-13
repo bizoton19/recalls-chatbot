@@ -55,9 +55,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8001:8001"
-    # No GPU needed — runs on CPU fine for dev
-    profiles:
-      - clip   # opt-in: docker compose --profile clip up
 
   frontend:
     build:

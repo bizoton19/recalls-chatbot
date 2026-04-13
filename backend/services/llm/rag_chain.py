@@ -109,15 +109,14 @@ async def answer(
     history: list[dict],
     streaming: bool = False,
     max_retries: int = 3,
+    context_override: str | None = None,
 ) -> str | AsyncIterator[str]:
     """
     Generate an answer given a question, retrieved recalls, and chat history.
-
-    For non-streaming: retries on rate-limit errors with exponential backoff.
-    For streaming: returns an async generator that retries internally.
+    Pass context_override to use SQL tool results instead of RAG context.
     """
     inputs = {
-        "context": format_recalls_context(recalls),
+        "context": context_override if context_override is not None else format_recalls_context(recalls),
         "history": build_history(history),
         "question": question,
     }
@@ -138,7 +137,7 @@ async def answer(
             raise
 
 
-async def _stream_with_retry(inputs: dict, max_retries: int = 3) -> AsyncIterator[str]:
+async def _stream_with_retry(inputs: dict, max_retries: int = 3) -> AsyncIterator[str]:  # noqa: E303
     """Async generator that streams LLM tokens and retries the whole call on rate limits."""
     chain = build_rag_chain(streaming=True)
     for attempt in range(max_retries):

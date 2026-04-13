@@ -8,7 +8,9 @@ import {
   streamChatMessage,
   type ChatMessage,
   type RecallSource,
+  type ChartSpec,
 } from "@/lib/api";
+import { RecallChart } from "@/components/RecallChart";
 
 const SUGGESTIONS = [
   "Are there any recalls for baby products or cribs?",
@@ -28,6 +30,7 @@ function ChatPageInner() {
   const [input, setInput] = useState(initialQuery);
   const [sending, setSending] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [streamingChart, setStreamingChart] = useState<ChartSpec | undefined>();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -86,6 +89,7 @@ function ChatPageInner() {
       setSending(true);
       setInput("");
       setStreamingContent("");
+      setStreamingChart(undefined);
       setSources([]);
 
       // Add user message immediately
@@ -108,20 +112,24 @@ function ChatPageInner() {
           setStreamingContent(accumulated);
           scrollToBottom();
         },
-        (responseSources) => {
+        (responseSources, responseChart) => {
+          // onDone
           const assistantMsg: ChatMessage = {
             id: `assistant-${Date.now()}`,
             role: "assistant",
             content: accumulated,
             sources: responseSources,
+            chart: responseChart,
             created_at: new Date().toISOString(),
           };
           setMessages((prev) => [...prev, assistantMsg]);
           setStreamingContent("");
+          setStreamingChart(undefined);
           setSources(responseSources);
           setSending(false);
         },
         (err) => {
+          // onError
           console.error("Stream error:", err);
           const errorMsg: ChatMessage = {
             id: `error-${Date.now()}`,
@@ -132,6 +140,10 @@ function ChatPageInner() {
           setMessages((prev) => [...prev, errorMsg]);
           setStreamingContent("");
           setSending(false);
+        },
+        (chart) => {
+          // onChart — show chart immediately while text is still streaming
+          setStreamingChart(chart);
         }
       );
     },
@@ -189,10 +201,11 @@ function ChatPageInner() {
               ))}
 
               {/* Streaming bubble */}
-              {streamingContent && (
+              {(streamingContent || streamingChart) && (
                 <div className="chat-bubble chat-bubble--assistant">
+                  {streamingChart && <RecallChart spec={streamingChart} />}
                   {streamingContent}
-                  <span aria-hidden="true" style={{ opacity: .5 }}>▌</span>
+                  {streamingContent && <span aria-hidden="true" style={{ opacity: .5 }}>▌</span>}
                 </div>
               )}
 
@@ -313,6 +326,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       role={isUser ? undefined : "article"}
       aria-label={isUser ? "Your message" : "Assistant response"}
     >
+      {message.chart && <RecallChart spec={message.chart} />}
       {message.content}
     </div>
   );
