@@ -1,0 +1,28 @@
+---
+description: CPSC chat assistant Markdown, RAG prompts, and chat UI rendering
+globs: frontend/src/app/chat/**/*,frontend/src/lib/api.ts,backend/services/llm/rag_chain.py
+alwaysApply: false
+---
+
+# CPSC recalls chat — formatting and UX
+
+## Backend (`backend/services/llm/rag_chain.py`)
+
+- **`SYSTEM_PROMPT`**: Instruct the model to answer in **GitHub-flavored Markdown** readable in a chat bubble.
+- **Lists**: Put a **blank line** before the first numbered item and **after** the intro sentence (e.g. `...retailer:\n\n1.` — never `...retailer:1.`).
+- **Each recall**: Use a numbered block with **blank lines between** items; inside each item use `**Label:** value` on separate lines where helpful.
+- **Facts**: Use `recall_number`, dates, and URLs from the provided context only; avoid placeholder text like "Not specified" when the context omits a field — say it is not listed instead.
+- **Links**: `[short label](https://...)`; keep one primary link per recall (e.g. CPSC recall page).
+
+## Frontend (`frontend/src/app/chat/**`, `frontend/src/lib/api.ts`)
+
+- Render assistant text with a **Markdown** pipeline (`react-markdown` or equivalent + safe link handling, `rel="noopener noreferrer"` on external URLs) for both **streaming** and **saved** messages — not raw `{text}` only.
+- Reuse the same renderer for the streaming bubble and `MessageBubble` so formatting matches when the stream completes.
+
+## SSE (`frontend/src/lib/api.ts`)
+
+- Call **`onDone` only when `currentEvent === "done"`**. Empty `data:` lines must not finalize the stream (avoids duplicate assistant messages).
+
+## Related doc
+
+- Deeper product plan: `docs/advanced-search-plan.md`.
