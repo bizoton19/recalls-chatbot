@@ -109,6 +109,8 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 ## Architecture
 
+### Application (logical)
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │  Next.js Frontend (USWDS 3.x, 508 compliant)        │
@@ -138,6 +140,71 @@ OLLAMA_BASE_URL=http://localhost:11434
 │  └── ingestion_jobs (audit trail)                   │
 └─────────────────────────────────────────────────────┘
 ```
+
+### Azure deployment (secure: VNet + private Azure OpenAI)
+
+**Yes — this is the right pattern.** Put the **backend container** in a **private subnet** (Azure Container Apps with VNet, Azure Kubernetes Service, App Service with VNet integration, or Container Instances in a subnet). Attach a **private endpoint** to your **Azure OpenAI** resource, link a **Private DNS zone** for `privatelink.openai.azure.com` to that VNet, and **disable public network access** on the OpenAI resource when your policy allows. The backend then calls the same deployment (`AZURE_OPENAI_DEPLOYMENT`) over **private connectivity** — LLM traffic stays on the Microsoft backbone, not the public internet.
+
+Also use a **private endpoint** (or service firewall rules) for **Azure Database for PostgreSQL** with the **pgvector** extension, and expose only the **frontend** (and optionally an **Application Gateway / API Management** front door) to the internet over HTTPS.
+
+```mermaid
+flowchart TB
+  subgraph Internet["Internet"]
+    Users["Users / Browsers"]
+  end
+
+  subgraph Azure["Azure subscription"]
+    subgraph Edge["Public edge"]
+      FE["Next.js frontend<br/>Static Web Apps / App Service / Container Apps"]
+    end
+
+    subgraph VNet["Virtual network"]
+      subgraph PrivateSub["Private subnets"]
+        BE["FastAPI backend<br/>Docker / Container Apps / AKS"]
+      end
+
+      PE_OAI["Private endpoint<br/>Azure OpenAI"]
+      PE_PG["Private endpoint<br/>PostgreSQL Flexible Server<br/>pgvector"]
+
+      subgraph PaaS["Managed services"]
+        OAI["Azure OpenAI<br/>gpt-4o-mini deployment<br/>Public access disabled"]
+        PG[("PostgreSQL + pgvector")]
+      end
+
+      BE -->|"HTTPS API<br/>chat completions"| PE_OAI
+      BE -->|"DATABASE_URL"| PE_PG
+      PE_OAI --- OAI
+      PE_PG --- PG
+    end
+
+    DNS["Private DNS zone<br/>privatelink.openai.azure.com<br/>+ Postgres private DNS"]
+    DNS -.-> PE_OAI
+    DNS -.-> PE_PG
+  end
+
+  Users -->|"HTTPS"| FE
+  FE -->|"HTTPS / SSE<br/>NEXT_PUBLIC_API_URL"| BE
+  BE -->|"HTTPS outbound<br/>saferproducts.gov"| ExtCPSC["CPSC public API"]
+  BE -->|"HTTPS outbound<br/>optional: Google embeddings"| ExtGoogle["Google AI<br/>if EMBEDDING_PROVIDER=google"]
+
+  style OAI fill:#e8f4fc
+  style PG fill:#e8f4fc
+  style BE fill:#f0fff4
+```
+
+**Configuration notes**
+
+| Setting | Purpose |
+|--------|---------|
+| `AZURE_OPENAI_ENDPOINT` | Use the resource endpoint from Azure AI Foundry; with Private Link, ensure the container subnet uses the private DNS zone so this hostname resolves to the **private** IP. |
+| `AZURE_OPENAI_API_KEY` | Store in **Azure Key Vault** and inject via managed identity (recommended). |
+| `DATABASE_URL` | Connection string to **Azure PostgreSQL** over private connectivity (no public IP on the DB). |
+| `CORS_ORIGINS` | Your production frontend origin only. |
+| Outbound | Backend still needs egress to **saferproducts.gov** (ingestion) and, if used, **Google** / **OpenAI** for embeddings — lock down with **NAT Gateway + firewall rules** or **service-specific egress controls** per your security baseline. |
+
+**What this does *not* replace:** defense in depth still requires managed identities, Key Vault, least-privilege RBAC, and monitoring. VNet + private endpoint removes exposure of the OpenAI inference endpoint to the public internet from your architecture’s perspective.
+
+**Frontend → backend path:** If the API has **no public IP**, browsers cannot call it directly. Use **Application Gateway** (or **API Management**) with a **private** backend pool to the container, **Azure Front Door** + origin in a secured pattern, or host the Next.js app **in the same VNet** (e.g. private Container App) and expose only that tier. Set `NEXT_PUBLIC_API_URL` to the **public hostname** that terminates TLS and forwards to the private backend.
 
 ## Data Source
 
