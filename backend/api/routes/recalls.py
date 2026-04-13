@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from db.database import get_db
 from models.recall import Recall
 from services.vector.store import similarity_search
+from api.recall_serialize import prune_empty_vehicle_fields
 
 router = APIRouter(prefix="/recalls", tags=["recalls"])
 
@@ -55,7 +56,8 @@ async def search_recalls(
         product_type=product_type,
     )
 
-    return {"query": q, "results": results, "total": len(results)}
+    cleaned = [prune_empty_vehicle_fields({**r}) for r in results]
+    return {"query": q, "results": cleaned, "total": len(cleaned)}
 
 
 @router.get("/{recall_id}")
@@ -77,7 +79,7 @@ def _serialize(r: Recall) -> dict:
         if sorted_imgs:
             first_image = sorted_imgs[0].image_url
 
-    return {
+    out: dict = {
         "id": str(r.id),
         "agency_code": r.agency_code,
         "recall_number": r.recall_number,
@@ -90,13 +92,20 @@ def _serialize(r: Recall) -> dict:
         "product_type": r.product_type,
         "brand_name": r.brand_name,
         "manufacturer": r.manufacturer,
-        "vehicle_make": r.vehicle_make,
-        "vehicle_model": r.vehicle_model,
-        "vehicle_year_from": r.vehicle_year_from,
-        "vehicle_year_to": r.vehicle_year_to,
-        "component": r.component,
         "classification": r.classification,
         "units_affected": r.units_affected,
         "url": r.url,
         "image_url": first_image,
     }
+    # Vehicle fields exist for non-CPSC agencies (e.g. future NHTSA). CPSC JSON has none — omit when empty.
+    if r.vehicle_make or r.vehicle_model or r.vehicle_year_from is not None or r.vehicle_year_to is not None or r.component:
+        out["vehicle_make"] = r.vehicle_make
+        out["vehicle_model"] = r.vehicle_model
+        out["vehicle_year_from"] = r.vehicle_year_from
+        out["vehicle_year_to"] = r.vehicle_year_to
+        out["component"] = r.component
+    if r.manufacturer_countries:
+        out["manufacturer_countries"] = r.manufacturer_countries
+    if r.last_publish_date:
+        out["last_publish_date"] = r.last_publish_date.isoformat()
+    return prune_empty_vehicle_fields(out)

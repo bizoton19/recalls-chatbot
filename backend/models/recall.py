@@ -49,6 +49,7 @@ class Recall(Base):
     manufacturer: Mapped[Optional[str]] = mapped_column(Text)
     model_numbers: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text))
 
+    # Populated only for non-CPSC agencies (e.g. NHTSA vehicle recalls). CPSC JSON has no vehicle fields.
     vehicle_make: Mapped[Optional[str]] = mapped_column(String(255))
     vehicle_model: Mapped[Optional[str]] = mapped_column(String(255))
     vehicle_year_from: Mapped[Optional[int]] = mapped_column(SmallInteger)
