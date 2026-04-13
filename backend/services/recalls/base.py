@@ -43,6 +43,9 @@ class RecallRecord:
     reason_for_recall: Optional[str] = None
     classification: Optional[str] = None
 
+    manufacturer_countries: list[str] = field(default_factory=list)
+    last_publish_date: Optional[date] = None
+
     raw_data: Optional[dict] = None
 
 

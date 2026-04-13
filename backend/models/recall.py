@@ -60,6 +60,9 @@ class Recall(Base):
     reason_for_recall: Mapped[Optional[str]] = mapped_column(Text)
     classification: Mapped[Optional[str]] = mapped_column(String(50))
 
+    manufacturer_countries: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text))
+    last_publish_date: Mapped[Optional[date]] = mapped_column(Date)
+
     is_indexed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     raw_data: Mapped[Optional[dict]] = mapped_column(JSONB)
 
@@ -92,6 +95,8 @@ class Recall(Base):
             parts.append(f"Brand: {self.brand_name}")
         if self.manufacturer:
             parts.append(f"Manufacturer: {self.manufacturer}")
+        if self.manufacturer_countries:
+            parts.append(f"Country of manufacture: {', '.join(self.manufacturer_countries)}")
         if self.vehicle_make:
             parts.append(f"Vehicle: {self.vehicle_make} {self.vehicle_model or ''} ({self.vehicle_year_from}–{self.vehicle_year_to})")
         if self.hazard:

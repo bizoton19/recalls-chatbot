@@ -57,8 +57,17 @@ async def count_recalls(
     if product_type:
         q = q.where(Recall.product_type.ilike(f"%{product_type}%"))
     if country:
+        # Match CPSC ManufacturerCountries (column + legacy raw_data)
         q = q.where(
-            text("raw_data->>'CountryOfOrigin' ILIKE :c").bindparams(c=f"%{country}%")
+            text(
+                "("
+                "EXISTS (SELECT 1 FROM unnest(COALESCE(manufacturer_countries, ARRAY[]::text[])) AS x "
+                " WHERE lower(x) LIKE lower(:c_like))"
+                " OR EXISTS (SELECT 1 FROM jsonb_array_elements("
+                " COALESCE(raw_data->'ManufacturerCountries', '[]'::jsonb)) elem "
+                " WHERE lower(trim(elem->>'Country')) LIKE lower(:c_like))"
+                ")"
+            ).bindparams(c_like=f"%{country}%")
         )
 
     result = await db.execute(q)
@@ -223,12 +232,22 @@ async def recalls_by_country(
     db: AsyncSession,
     limit: int = 10,
 ) -> dict:
-    """Top countries of origin by recall count (from raw_data JSONB)."""
+    """Top manufacturer countries by recall count (CPSC ManufacturerCountries)."""
     q = text("""
-        SELECT raw_data->>'CountryOfOrigin' AS country, COUNT(*) AS count
-        FROM recalls
-        WHERE raw_data->>'CountryOfOrigin' IS NOT NULL
-          AND raw_data->>'CountryOfOrigin' != ''
+        SELECT country, COUNT(DISTINCT recall_id) AS count FROM (
+            SELECT r.id AS recall_id, trim(x) AS country
+            FROM recalls r
+            CROSS JOIN LATERAL unnest(COALESCE(r.manufacturer_countries, ARRAY[]::text[])) AS x
+            WHERE trim(x) IS NOT NULL AND trim(x) != ''
+            UNION ALL
+            SELECT r.id, trim(elem->>'Country')
+            FROM recalls r
+            CROSS JOIN LATERAL jsonb_array_elements(
+                COALESCE(r.raw_data->'ManufacturerCountries', '[]'::jsonb)
+            ) elem
+            WHERE (r.manufacturer_countries IS NULL OR cardinality(r.manufacturer_countries) = 0)
+              AND trim(elem->>'Country') IS NOT NULL AND trim(elem->>'Country') != ''
+        ) u
         GROUP BY country
         ORDER BY count DESC
         LIMIT :limit

@@ -29,6 +29,33 @@ async def lifespan(app: FastAPI):
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
 
+        # Add recall columns when missing (existing DBs won't auto-alter with create_all)
+        await conn.execute(text(
+            "ALTER TABLE recalls ADD COLUMN IF NOT EXISTS manufacturer_countries TEXT[]"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE recalls ADD COLUMN IF NOT EXISTS last_publish_date DATE"
+        ))
+        # Backfill manufacturer_countries from raw_data JSON (CPSC: ManufacturerCountries[].Country)
+        await conn.execute(text("""
+            UPDATE recalls r
+            SET manufacturer_countries = sub.arr
+            FROM (
+                SELECT id AS sid,
+                    (
+                        SELECT COALESCE(array_agg(DISTINCT trim(e->>'Country')), ARRAY[]::text[])
+                        FROM jsonb_array_elements(
+                            COALESCE(raw_data->'ManufacturerCountries', '[]'::jsonb)
+                        ) AS e
+                        WHERE trim(e->>'Country') IS NOT NULL AND trim(e->>'Country') != ''
+                    ) AS arr
+                FROM recalls
+            ) sub
+            WHERE r.id = sub.sid
+              AND (r.manufacturer_countries IS NULL OR cardinality(r.manufacturer_countries) = 0)
+              AND sub.arr IS NOT NULL AND cardinality(sub.arr) > 0
+        """))
+
         # Migrate embedding column from vector(1536) → vector(768) if needed.
         # recall_embeddings is safe to truncate since indexing runs on every startup.
         await conn.execute(text(

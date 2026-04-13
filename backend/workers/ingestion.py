@@ -12,6 +12,7 @@ Scheduled every INGESTION_SCHEDULE_HOURS hours via APScheduler.
 Also triggered manually via POST /api/admin/ingest.
 """
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime
@@ -55,6 +56,8 @@ def record_to_dict(r: RecallRecord) -> dict:
         "distribution_pattern": r.distribution_pattern,
         "reason_for_recall": r.reason_for_recall,
         "classification": r.classification,
+        "manufacturer_countries": r.manufacturer_countries or None,
+        "last_publish_date": r.last_publish_date,
         "raw_data": r.raw_data,
         "is_indexed": False,
         "updated_at": datetime.utcnow(),
@@ -82,11 +85,15 @@ async def upsert_recalls(records: list[RecallRecord], db) -> tuple[int, int]:
         existing_recall = existing.scalar_one_or_none()
 
         if existing_recall:
-            # Update only if title or key fields changed
+            # Update when normalized fields or full API payload changed
+            old_raw = json.dumps(existing_recall.raw_data or {}, sort_keys=True, default=str)
+            new_raw = json.dumps(record.raw_data or {}, sort_keys=True, default=str)
             changed = (
                 existing_recall.title != record.title
                 or existing_recall.hazard != record.hazard
                 or existing_recall.remedy != record.remedy
+                or existing_recall.description != record.description
+                or old_raw != new_raw
             )
             if changed:
                 for key, value in row.items():
