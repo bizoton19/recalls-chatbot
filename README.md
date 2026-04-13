@@ -208,6 +208,8 @@ flowchart TB
 
 Planned UX for linking chat counts to a filterable recall list: [docs/advanced-search-plan.md](docs/advanced-search-plan.md).
 
+**Azure Container Apps (Bicep):** Use `infra/main.bicepparam.example` as a template; copy to `infra/main.bicepparam` locally (gitignored, may contain secrets). See [infra/README.md](infra/README.md).
+
 ## Data Source
 
 All recall data is sourced from the publicly available CPSC REST API:

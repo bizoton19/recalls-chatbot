@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 
+# Azure Bicep — local secrets + org-specific names (example: main.bicepparam.example)
+infra/main.bicepparam
+
 # Python
 __pycache__/
 *.py[cod]

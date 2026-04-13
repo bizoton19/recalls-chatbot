@@ -23,6 +23,14 @@ LOCATION="${LOCATION:-eastus}"
 ACR_NAME="${ACR_NAME:-cpscrecallsacr}"      # must match main.bicepparam
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD 2>/dev/null || echo latest)}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PARAM_FILE="${PARAM_FILE:-$REPO_ROOT/infra/main.bicepparam}"
+
+if [[ ! -f "$PARAM_FILE" ]]; then
+  echo "Missing parameter file: $PARAM_FILE"
+  echo "Copy the example and fill in secrets (file is gitignored):"
+  echo "  cp infra/main.bicepparam.example infra/main.bicepparam"
+  exit 1
+fi
 
 # ── Parse optional args ───────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -50,7 +58,7 @@ echo "── Step 2/5: Deploy infrastructure (ACR + Container Apps env) ──"
 az deployment group create \
   --resource-group "$RESOURCE_GROUP" \
   --template-file  "$REPO_ROOT/infra/main.bicep" \
-  --parameters     "$REPO_ROOT/infra/main.bicepparam" \
+  --parameters     "$PARAM_FILE" \
   --output none
 echo "   ✓ Infrastructure ready"
 
@@ -89,7 +97,7 @@ echo "── Step 4/5: Deploy container apps with real images ──"
 az deployment group create \
   --resource-group "$RESOURCE_GROUP" \
   --template-file  "$REPO_ROOT/infra/main.bicep" \
-  --parameters     "$REPO_ROOT/infra/main.bicepparam" \
+  --parameters     "$PARAM_FILE" \
   --parameters \
     clipImage="$CLIP_IMAGE" \
     backendImage="$BACKEND_IMAGE" \

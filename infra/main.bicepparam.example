@@ -1,0 +1,26 @@
+using './main.bicep'
+
+// Copy to main.bicepparam (gitignored) and fill secrets — do not commit main.bicepparam.
+//   cp infra/main.bicepparam.example infra/main.bicepparam
+
+// ── Identity ──────────────────────────────────────────────────────────────────
+param appName = 'recalls-chatbot'
+
+// Must be globally unique, 5-50 chars, alphanumeric only
+param acrName = 'recallschatbotacr'
+
+// ── Images (deploy.sh overwrites these after building) ───────────────────────
+param clipImage    = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param backendImage = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param frontendImage = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
+// ── Secrets — set in your local main.bicepparam only ─────────────────────────
+param databaseUrl        = ''
+param azureOpenAiApiKey  = ''
+param googleApiKey       = ''
+
+// ── Non-secret config ─────────────────────────────────────────────────────────
+param azureOpenAiEndpoint   = 'https://YOUR_RESOURCE.openai.azure.com/'
+param azureOpenAiDeployment = 'gpt-4o-mini-recalls'
+param azureOpenAiApiVersion = '2024-12-01-preview'
+param adminApiKey           = 'change-me-in-prod'
