@@ -206,19 +206,7 @@ flowchart TB
 
 **Frontend → backend path:** If the API has **no public IP**, browsers cannot call it directly. Use **Application Gateway** (or **API Management**) with a **private** backend pool to the container, **Azure Front Door** + origin in a secured pattern, or host the Next.js app **in the same VNet** (e.g. private Container App) and expose only that tier. Set `NEXT_PUBLIC_API_URL` to the **public hostname** that terminates TLS and forwards to the private backend.
 
-## Roadmap: advanced search from chat (deep links)
-
-When the assistant cites a **count** (e.g. “127 recalls involving Chinese manufacturers”), link that number to **`/search/advanced`** (or similar) so users can open the underlying result set.
-
-| Step | Work |
-|------|------|
-| 1. **Query params** | Define a stable contract, e.g. `?country=China&source=manufacturer` or `?q=...` — mirror filters the SQL tools already use (`manufacturer_countries`, date range, agency). |
-| 2. **Backend** | Add `GET /api/recalls/filter` (or extend `/api/recalls/search`) that accepts structured filters and returns the same recall shape as `/api/recalls/latest` (pagination optional). Reuse DB conditions from `services/llm/tools.py` where possible. |
-| 3. **Advanced search page** | New Next.js route that reads params on mount, calls the filter API, shows **same card layout** as the homepage “latest recalls” section (extract shared `<RecallCard>` if needed). |
-| 4. **Chat UI** | Post-process assistant markdown/HTML or a small structured block from the API (e.g. `{ "explore": { "count": 127, "href": "/search/advanced?country=China" } }`) so the model does not have to invent URLs — **preferred**: backend adds `metadata.explore_url` on SQL-tool responses; frontend wraps matching numbers in `<Link>`. |
-| 5. **Accessibility** | Link text describes destination (“View 127 matching recalls”) not just “127”. |
-
-**Bugfix (duplicate chat replies):** The stream parser was calling `onDone` for any empty `data:` line, not only `event: done`, which appended the assistant message twice. Fixed in `frontend/src/lib/api.ts`.
+Planned UX for linking chat counts to a filterable recall list: [docs/advanced-search-plan.md](docs/advanced-search-plan.md).
 
 ## Data Source
 
