@@ -17,7 +17,7 @@ When editing `backend/services/llm/rag_chain.py` or prompts for the recall assis
 
 When editing `frontend/src/app/chat/**` or chat API client:
 
-- Assistant content should be shown through a **Markdown renderer** (e.g. `react-markdown` + sanitization) for **streaming and final** bubbles, not plain text only, so `**bold**` and links render.
+- Assistant content is rendered with **`ChatMarkdown`** (`react-markdown`, `remark-gfm`, `rehype-sanitize` in `frontend/src/components/ChatMarkdown.tsx`) for streaming and final bubbles.
 - External links: `target="_blank"` and `rel="noopener noreferrer"` where appropriate.
 
 ## Streaming client (`frontend/src/lib/api.ts`)

@@ -11,6 +11,7 @@ import {
   type ChartSpec,
 } from "@/lib/api";
 import { RecallChart } from "@/components/RecallChart";
+import { ChatMarkdown } from "@/components/ChatMarkdown";
 
 const SUGGESTIONS = [
   "Are there any recalls for baby products or cribs?",
@@ -53,7 +54,7 @@ function ChatPageInner() {
             id: "welcome",
             role: "assistant",
             content:
-              "Hello! I'm the CPSC Recall Assistant. I can help you find information about consumer product recalls from the U.S. Consumer Product Safety Commission.\n\nYou can ask me things like:\n• \"Is my [product name] recalled?\"\n• \"Are there recalls for [brand] products?\"\n• \"What should I do if I have a recalled product?\"\n\nHow can I help you today?",
+              "Hello! I'm the **CPSC Recall Assistant**. I can help you find information about consumer product recalls from the U.S. Consumer Product Safety Commission.\n\nYou can ask me things like:\n\n- \"Is my [product name] recalled?\"\n- \"Are there recalls for [brand] products?\"\n- \"What should I do if I have a recalled product?\"\n\nHow can I help you today?",
             created_at: new Date().toISOString(),
           },
         ]);
@@ -204,8 +205,12 @@ function ChatPageInner() {
               {(streamingContent || streamingChart) && (
                 <div className="chat-bubble chat-bubble--assistant">
                   {streamingChart && <RecallChart spec={streamingChart} />}
-                  {streamingContent}
-                  {streamingContent && <span aria-hidden="true" style={{ opacity: .5 }}>▌</span>}
+                  {streamingContent ? (
+                    <>
+                      <ChatMarkdown>{streamingContent}</ChatMarkdown>
+                      <span aria-hidden="true" style={{ opacity: .5 }}>▌</span>
+                    </>
+                  ) : null}
                 </div>
               )}
 
@@ -327,7 +332,11 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       aria-label={isUser ? "Your message" : "Assistant response"}
     >
       {message.chart && <RecallChart spec={message.chart} />}
-      {message.content}
+      {isUser ? (
+        message.content
+      ) : (
+        <ChatMarkdown>{message.content}</ChatMarkdown>
+      )}
     </div>
   );
 }

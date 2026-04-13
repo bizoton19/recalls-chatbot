@@ -70,14 +70,14 @@ export function RecallChart({ spec }: { spec: ChartSpec }) {
               cy="50%"
               outerRadius={100}
               label={({ name, percent }) =>
-                `${truncate(name, 14)} ${(percent * 100).toFixed(0)}%`
+                `${truncate(String(name ?? ""), 14)} ${((percent ?? 0) * 100).toFixed(0)}%`
               }
             >
               {chartData.map((_, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(v: number) => [v, "Recalls"]} />
+            <Tooltip formatter={(v) => [Number(v ?? 0), "Recalls"]} />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
@@ -119,7 +119,7 @@ export function RecallChart({ spec }: { spec: ChartSpec }) {
               </>
             )}
             <Tooltip
-              formatter={(v: number) => [v, "Recalls"]}
+              formatter={(v) => [Number(v ?? 0), "Recalls"]}
               labelFormatter={(l) => String(l)}
             />
             <Bar dataKey="value" radius={[3, 3, 0, 0]}>

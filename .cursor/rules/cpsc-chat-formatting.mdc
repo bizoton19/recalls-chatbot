@@ -16,8 +16,8 @@ alwaysApply: false
 
 ## Frontend (`frontend/src/app/chat/**`, `frontend/src/lib/api.ts`)
 
-- Render assistant text with a **Markdown** pipeline (`react-markdown` or equivalent + safe link handling, `rel="noopener noreferrer"` on external URLs) for both **streaming** and **saved** messages — not raw `{text}` only.
-- Reuse the same renderer for the streaming bubble and `MessageBubble` so formatting matches when the stream completes.
+- Assistant bubbles use **`ChatMarkdown`** (`react-markdown` + `remark-gfm` + `rehype-sanitize` in `frontend/src/components/ChatMarkdown.tsx`) for both **streaming** and **saved** messages. User bubbles stay plain text.
+- External links (`http`/`https`): `target="_blank"` and `rel="noopener noreferrer"`.
 
 ## SSE (`frontend/src/lib/api.ts`)
 
