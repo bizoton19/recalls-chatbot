@@ -175,10 +175,12 @@ export function streamChatMessage(
                 pendingChart = JSON.parse(payload);
                 if (onChart && pendingChart) onChart(pendingChart);
               } catch { /* ignore */ }
-            } else if (currentEvent === "done" || payload === "") {
+            } else if (currentEvent === "done") {
+              // Only finalize on explicit `event: done` — empty `data:` lines
+              // (e.g. empty LLM tokens) must not call onDone or the assistant reply duplicates.
               onDone([], pendingChart);
-            } else {
-              if (payload) onToken(payload);
+            } else if (payload) {
+              onToken(payload);
             }
             currentEvent = "";
           }
