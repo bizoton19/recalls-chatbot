@@ -1,6 +1,8 @@
 # Advanced search from chat (deep links)
 
-When the assistant cites a **count** (e.g. “127 recalls involving Chinese manufacturers”), link that number to **`/search/advanced`** (or a similar route) so users can open the underlying result set.
+**Implemented:** dedicated route **`/search/advanced`** with structured filters and keyword search (`GET /api/recalls/filter`). Primary nav includes **Advanced** next to **Search** (semantic + image).
+
+When the assistant cites a **count** (e.g. “127 recalls involving Chinese manufacturers”), link that number to **`/search/advanced?country=…`** so users can open the underlying result set.
 
 ## Goals
 

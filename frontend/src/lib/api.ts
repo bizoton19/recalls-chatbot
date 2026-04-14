@@ -61,6 +61,43 @@ export async function getLatestRecalls(limit = 20): Promise<Recall[]> {
   return data.recalls;
 }
 
+export interface FilteredRecallsResponse {
+  recalls: Recall[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface RecallFilterParams {
+  agency_code?: string;
+  date_from?: string;
+  date_to?: string;
+  brand?: string;
+  product_type?: string;
+  country?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getFilteredRecalls(
+  params: RecallFilterParams
+): Promise<FilteredRecallsResponse> {
+  const sp = new URLSearchParams();
+  if (params.agency_code) sp.set("agency_code", params.agency_code);
+  if (params.date_from) sp.set("date_from", params.date_from);
+  if (params.date_to) sp.set("date_to", params.date_to);
+  if (params.brand) sp.set("brand", params.brand);
+  if (params.product_type) sp.set("product_type", params.product_type);
+  if (params.country) sp.set("country", params.country);
+  if (params.search) sp.set("search", params.search);
+  if (params.limit != null) sp.set("limit", String(params.limit));
+  if (params.offset != null) sp.set("offset", String(params.offset));
+  const res = await fetch(`${API_URL}/api/recalls/filter?${sp}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Filter search failed");
+  return res.json();
+}
+
 export async function searchRecalls(query: string, topK = 8): Promise<Recall[]> {
   const params = new URLSearchParams({ q: query, top_k: String(topK) });
   const res = await fetch(`${API_URL}/api/recalls/search?${params}`);

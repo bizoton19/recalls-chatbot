@@ -123,7 +123,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </li>
                 <li className="usa-nav__primary-item">
                   <a href="/search" className="usa-nav__link">
-                    <span>Image Search</span>
+                    <span>Search</span>
+                  </a>
+                </li>
+                <li className="usa-nav__primary-item">
+                  <a href="/search/advanced" className="usa-nav__link">
+                    <span>Advanced</span>
                   </a>
                 </li>
                 <li className="usa-nav__primary-item">

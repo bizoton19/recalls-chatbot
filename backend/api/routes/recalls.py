@@ -1,13 +1,14 @@
 from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from db.database import get_db
 from models.recall import Recall
 from services.vector.store import similarity_search
+from services.recalls.filter_builder import apply_recall_filters
 from api.recall_serialize import prune_empty_vehicle_fields
 
 router = APIRouter(prefix="/recalls", tags=["recalls"])
@@ -58,6 +59,69 @@ async def search_recalls(
 
     cleaned = [prune_empty_vehicle_fields({**r}) for r in results]
     return {"query": q, "results": cleaned, "total": len(cleaned)}
+
+
+@router.get("/filter")
+async def filter_recalls(
+    agency_code: Optional[str] = Query(
+        default=None,
+        description="Agency code (e.g. CPSC). Omit for all agencies.",
+    ),
+    date_from: Optional[date] = Query(default=None),
+    date_to: Optional[date] = Query(default=None),
+    brand: Optional[str] = Query(default=None, description="Brand name contains"),
+    product_type: Optional[str] = Query(default=None),
+    country: Optional[str] = Query(
+        default=None,
+        description="Manufacturer country contains (matches CPSC ManufacturerCountries)",
+    ),
+    search: Optional[str] = Query(
+        default=None,
+        description="Keyword search across title, description, hazard, product, manufacturer",
+    ),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Structured filter + keyword search over recalls (for advanced search / deep links).
+    """
+    count_stmt = select(func.count()).select_from(Recall)
+    count_stmt = apply_recall_filters(
+        count_stmt,
+        agency_code=agency_code,
+        date_from=date_from,
+        date_to=date_to,
+        brand=brand,
+        product_type=product_type,
+        country=country,
+        search=search,
+    )
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    list_stmt = select(Recall).options(selectinload(Recall.images))
+    list_stmt = apply_recall_filters(
+        list_stmt,
+        agency_code=agency_code,
+        date_from=date_from,
+        date_to=date_to,
+        brand=brand,
+        product_type=product_type,
+        country=country,
+        search=search,
+    )
+    list_stmt = list_stmt.order_by(
+        desc(Recall.recall_date), desc(Recall.created_at)
+    ).offset(offset).limit(limit)
+
+    result = await db.execute(list_stmt)
+    recalls = result.scalars().all()
+    return {
+        "recalls": [_serialize(r) for r in recalls],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/{recall_id}")

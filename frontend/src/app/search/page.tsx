@@ -765,6 +765,12 @@ function SearchPageInner() {
             Search CPSC product recalls by keyword. Use the AI assistant for
             detailed questions.
           </p>
+          <p style={{ opacity: 0.85, maxWidth: 520, marginTop: "-0.75rem", marginBottom: "1.25rem", fontSize: ".9rem" }}>
+            <a href="/search/advanced" style={{ color: "#fff", fontWeight: 600, textDecoration: "underline" }}>
+              Advanced search
+            </a>
+            {" — filters by country, brand, product type, dates, and keywords."}
+          </p>
 
           <form
             onSubmit={(e) => {

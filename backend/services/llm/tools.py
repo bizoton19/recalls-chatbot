@@ -9,6 +9,7 @@ from sqlalchemy import func, text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.recall import Recall
+from services.recalls.filter_builder import apply_recall_filters
 
 
 # ── Chart spec helpers ────────────────────────────────────────────────────────
@@ -45,30 +46,15 @@ async def count_recalls(
 ) -> dict:
     """Count recalls matching the given filters."""
     q = select(func.count()).select_from(Recall)
-
-    if agency_code:
-        q = q.where(Recall.agency_code == agency_code)
-    if date_from:
-        q = q.where(Recall.recall_date >= date_from)
-    if date_to:
-        q = q.where(Recall.recall_date <= date_to)
-    if brand:
-        q = q.where(Recall.brand_name.ilike(f"%{brand}%"))
-    if product_type:
-        q = q.where(Recall.product_type.ilike(f"%{product_type}%"))
-    if country:
-        # Match CPSC ManufacturerCountries (column + legacy raw_data)
-        q = q.where(
-            text(
-                "("
-                "EXISTS (SELECT 1 FROM unnest(COALESCE(manufacturer_countries, ARRAY[]::text[])) AS x "
-                " WHERE lower(x) LIKE lower(:c_like))"
-                " OR EXISTS (SELECT 1 FROM jsonb_array_elements("
-                " COALESCE(raw_data->'ManufacturerCountries', '[]'::jsonb)) elem "
-                " WHERE lower(trim(elem->>'Country')) LIKE lower(:c_like))"
-                ")"
-            ).bindparams(c_like=f"%{country}%")
-        )
+    q = apply_recall_filters(
+        q,
+        agency_code=agency_code,
+        date_from=date_from,
+        date_to=date_to,
+        brand=brand,
+        product_type=product_type,
+        country=country,
+    )
 
     result = await db.execute(q)
     count = result.scalar() or 0
