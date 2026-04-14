@@ -20,7 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.database import get_db
 from models.recall import ChatSession, ChatMessage
-from services.vector.store import similarity_search
+from services.vector.store import (
+    SIMILARITY_THRESHOLD_CHAT,
+    keyword_recall_search,
+    similarity_search,
+)
 from services.llm.rag_chain import answer, format_recalls_context
 from services.llm.router import classify_intent, dispatch_sql_tool, format_tool_context
 
@@ -97,9 +101,19 @@ async def send_message(
             recalls = await similarity_search(
                 query=body.message,
                 db=db,
-                top_k=8,
+                top_k=12,
                 agency_codes=agency_filter,
+                min_similarity=SIMILARITY_THRESHOLD_CHAT,
             )
+            if not recalls:
+                recalls = await keyword_recall_search(
+                    body.message,
+                    db,
+                    top_k=8,
+                    agency_codes=agency_filter,
+                )
+                if recalls:
+                    logger.info("Chat RAG: keyword fallback returned %d recalls", len(recalls))
         except Exception as e:
             logger.warning("Similarity search failed: %s", e)
             recalls = []
