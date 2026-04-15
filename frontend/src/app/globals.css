@@ -171,14 +171,24 @@
 }
 .chat-markdown ul,
 .chat-markdown ol {
-  margin: .35rem 0 .65rem;
+  margin: .35rem 0 .85rem;
   padding-left: 1.35rem;
+}
+.chat-markdown ol > li {
+  margin-bottom: 1rem;
+  padding-bottom: .15rem;
+}
+.chat-markdown ol > li:last-child {
+  margin-bottom: 0;
 }
 .chat-markdown li {
   margin-bottom: .35rem;
 }
 .chat-markdown li > p {
-  margin: 0;
+  margin: 0 0 .4rem;
+}
+.chat-markdown li > p:last-child {
+  margin-bottom: 0;
 }
 .chat-markdown strong {
   font-weight: 600;

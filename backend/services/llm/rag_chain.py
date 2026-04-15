@@ -27,12 +27,29 @@ You can help with questions like:
 - "Are there any recalls related to [hazard type]?"
 - "What should I do if my product is recalled?"
 
-Formatting (GitHub-flavored Markdown — the UI renders this):
-- Use **bold** for labels like **Recall number:**, **Brand:**, **Date:**, **Hazard:**, **Remedy:**.
-- When listing multiple recalls, use a numbered list. Put a blank line between the introductory sentence and the first item, and blank lines between items so numbers never run into the previous sentence (e.g. end the intro with a period, then two newlines, then "1.").
-- Within each numbered item, put key facts on separate lines; use bullet sub-lists if helpful.
-- For links use [short label](URL) with URLs from the context below. One primary CPSC/saferproducts link per recall when available.
-- Do not write "Not specified" for a field unless the context explicitly says it is missing; if absent from context, omit the line or say it is not listed in the retrieved record.
+Formatting (GitHub-flavored Markdown — the UI renders this). Follow these rules strictly:
+- Use **bold** for labels: **Recall number:**, **Brand:**, **Date:**, **Hazard:**, **Remedy:**.
+- When you list two or more recalls, you MUST use a Markdown ordered list (`1.` `2.` …). 
+- Critical spacing: end your intro paragraph with a period, then insert TWO line breaks before `1.` — never run the intro into the list. Forbidden: `details:1.` or any `word:1.` on one line; the colon before `1` must not touch the numeral.
+- Put one blank line between each numbered item so each recall is visually separate.
+- Inside each list item, put each field on its own line (after the opening `1.` line, break before **Brand:**, etc.). Keep paragraphs inside an item readable; avoid one giant run-on sentence.
+- For the official notice link, use [View recall on CPSC.gov](URL) with the exact URL from the context — not plain text like "More info: CPSC Recall Notice".
+- Do not write "Not specified" for recall number, brand, or date when the context below includes them; copy values from the context.
+
+Example shape when multiple recalls are in context (structure only):
+
+Yes, there are recalls that match.
+
+1. **Recall number:** 26-XXX  
+**Brand:** Example Brand  
+**Date:** April 1, 2026  
+**Hazard:** …  
+**Remedy:** …  
+[View recall on CPSC.gov](https://www.cpsc.gov/...)
+
+2. **Recall number:** 26-YYY  
+**Brand:** …  
+(etc.)
 
 Guidelines:
 - Answer clearly and concisely in plain language (8th grade reading level)
@@ -70,6 +87,8 @@ def format_recalls_context(recalls: list[dict]) -> str:
         lines = [f"[Recall {i}]"]
         lines.append(f"Title: {r.get('title', 'Unknown')}")
         lines.append(f"Agency: {r.get('agency_code', 'Unknown')}")
+        if r.get("recall_number"):
+            lines.append(f"Recall number: {r['recall_number']}")
         if r.get("recall_date"):
             lines.append(f"Date: {r['recall_date']}")
         if r.get("product_name"):
@@ -88,7 +107,7 @@ def format_recalls_context(recalls: list[dict]) -> str:
         if r.get("remedy"):
             lines.append(f"Remedy: {r['remedy']}")
         if r.get("url"):
-            lines.append(f"More info: {r['url']}")
+            lines.append(f"Official URL (use in markdown link): {r['url']}")
         parts.append("\n".join(lines))
 
     return "\n\n---\n\n".join(parts)
